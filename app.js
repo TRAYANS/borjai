@@ -5,8 +5,54 @@ import * as finance from "./src/finance.js";
 import { buildLocalCoachAnswer } from "./src/coach.js";
 import { buildFinancialContext } from "./src/financial-context.js";
 import { appSignature } from "./src/version.js";
+import { isAuthenticated, authenticate, logout } from "./src/access.js";
 
 const KEY = LOCAL_STORAGE_KEY;
+
+function accessScreen() {
+  document.body.innerHTML = `
+    <main style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#090a0d;color:#fff;font-family:system-ui,sans-serif">
+      <section style="width:min(420px,90%);padding:32px;border:1px solid #292c33;border-radius:20px;background:#111318;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+        <div style="font-size:28px;font-weight:700;margin-bottom:8px">Borja<span style="color:#f32d3a">AI</span></div>
+        <p style="color:#9da3ad;margin-bottom:24px">Introduce la clave para acceder.</p>
+        <input id="access-key" type="password" placeholder="Clave de acceso"
+          style="width:100%;box-sizing:border-box;padding:14px;border-radius:10px;border:1px solid #383c45;background:#090a0d;color:#fff;font-size:16px">
+        <button id="access-button"
+          style="width:100%;margin-top:12px;padding:14px;border:0;border-radius:10px;background:#f32d3a;color:#fff;font-weight:700;font-size:16px;cursor:pointer">
+          Entrar
+        </button>
+        <p id="access-error" style="color:#f32d3a;min-height:20px;margin-top:12px"></p>
+      </section>
+    </main>
+  `;
+
+  const input = document.getElementById("access-key");
+  const button = document.getElementById("access-button");
+  const error = document.getElementById("access-error");
+
+  function enter() {
+    if (authenticate(input.value)) {
+      location.reload();
+    } else {
+      error.textContent = "Clave incorrecta.";
+      input.value = "";
+      input.focus();
+    }
+  }
+
+  button.addEventListener("click", enter);
+  input.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") enter();
+  });
+
+  input.focus();
+}
+
+if (!isAuthenticated()) {
+  accessScreen();
+  throw new Error("Acceso requerido.");
+}
+
 const ICONS = {
   home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   arrows:'<path d="M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3"/>',
