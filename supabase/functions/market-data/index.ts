@@ -14,6 +14,7 @@ const MARKET_SOURCES: Record<string, { source: string; symbol: string }> = {
   eurostoxx: { source: "av", symbol: "FEZ" }, spain: { source: "av", symbol: "EWP" }, germany: { source: "av", symbol: "EWG" }, france: { source: "av", symbol: "EWQ" }, italy: { source: "av", symbol: "EWI" }, uk: { source: "av", symbol: "EWU" },
   japan: { source: "av", symbol: "EWJ" }, china: { source: "av", symbol: "FXI" }, hongkong: { source: "av", symbol: "EWH" }, southkorea: { source: "av", symbol: "EWY" }, taiwan: { source: "av", symbol: "EWT" }, india: { source: "av", symbol: "INDA" },
   emerging: { source: "av", symbol: "EEM" }, brazil: { source: "av", symbol: "EWZ" }, latin: { source: "av", symbol: "ILF" }, world: { source: "av", symbol: "URTH" }, allworld: { source: "av", symbol: "ACWI" },
+  iwda: { source: "av", symbol: "IWDA" },
   btc: { source: "cg", symbol: "bitcoin" }, eth: { source: "cg", symbol: "ethereum" }
 };
 
@@ -35,7 +36,7 @@ async function alphaVantage(symbol: string) {
   if (data.Information) throw new Error(data.Information);
   const quote = data["Global Quote"];
   if (!quote?.["05. price"]) throw new Error(`Cotización no disponible para ${symbol}.`);
-  return { price: Number(quote["05. price"]), change: Number(String(quote["10. change percent"] || "").replace("%", "")), source: "alpha_vantage", symbol };
+  return { price: Number(quote["05. price"]), change: Number(String(quote["10. change percent"] || "0").replace("%", "")), source: "alpha_vantage", symbol };
 }
 
 async function coinGecko(id: string) {
@@ -48,7 +49,7 @@ async function coinGecko(id: string) {
   const data = await response.json();
   const quote = data[id];
   if (!quote) throw new Error(`Cotización no disponible para ${id}.`);
-  return { price: Number(quote.eur), change: Number(quote.eur_24h_change), source: "coingecko", symbol: id };
+  return { price: Number(quote.eur), change: Number(quote.eur_24h_change || 0), source: "coingecko", symbol: id };
 }
 
 Deno.serve(async (request) => {
@@ -57,7 +58,6 @@ Deno.serve(async (request) => {
 
   const authHeader = request.headers.get("Authorization");
   if (!authHeader) return json({ error: "Autenticación requerida" }, 401);
-
   const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", { global: { headers: { Authorization: authHeader } } });
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return json({ error: "Sesión no válida" }, 401);
@@ -70,7 +70,7 @@ Deno.serve(async (request) => {
     ids = (url.searchParams.get("ids") || "").split(",").map((id) => id.trim()).filter(Boolean);
   }
 
-  const requested = ids.length ? ids : Object.keys(MARKET_SOURCES);
+  const requested = [...new Set(ids.length ? ids : Object.keys(MARKET_SOURCES))].slice(0, 30);
   const results = await Promise.all(requested.map(async (id) => {
     const market = MARKET_SOURCES[id];
     if (!market) return { id, error: "Mercado no soportado" };
