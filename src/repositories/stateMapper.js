@@ -87,12 +87,7 @@ export function toDatabaseRows(state, userId) {
       };
     }),
     categories: Array.from(categories.values()).map(function(c) {
-      return {
-        user_id: userId,
-        name: c.name,
-        type: c.type,
-        is_system: false
-      };
+      return { user_id: userId, name: c.name, type: c.type, is_system: false };
     }),
     transactions: dedupeTransactions(state.transactions).map(function(t) {
       return {
@@ -195,34 +190,47 @@ export function toDatabaseRows(state, userId) {
 }
 
 export function fromDatabaseRows(rows, fallbackFactory) {
-  const fallback = fallbackFactory ? fallbackFactory() : { profile: {} };
-  const accounts = (rows.accounts || []).map(function(a) {
+  const fallback = fallbackFactory ? fallbackFactory() : { profile: {}, accounts: [], assets: [], debts: [], transactions: [], goals: [], imports: [], snapshots: [] };
+  const dbAccounts = rows.accounts || [];
+  const dbAssets = rows.assets || [];
+  const dbTransactions = rows.transactions || [];
+  const dbLiabilities = rows.liabilities || [];
+  const dbGoals = rows.goals || [];
+  const dbImports = rows.imports || [];
+  const dbSnapshots = rows.wealth_snapshots || [];
+
+  // Si Supabase esta conectado pero todavia no hay registros, no dejamos
+  // el estado vacio: conservamos el estado inicial para que los formularios
+  // de cuentas, transferencias y demas sigan teniendo opciones.
+  const accounts = dbAccounts.length ? dbAccounts.map(function(a) {
     return { id: a.legacy_id || a.id, name: a.name, kind: a.type === "cash" ? "cash" : a.type === "broker" ? "broker" : "bank", balance: asNumber(a.current_balance) };
-  });
-  const assets = (rows.assets || []).map(function(a) {
+  }) : (fallback.accounts || []).map(function(a) { return Object.assign({}, a); });
+
+  const assets = dbAssets.length ? dbAssets.map(function(a) {
     const metadata = a.metadata || {};
     return { id: a.legacy_id || a.id, name: a.name, ticker: a.ticker || "", group: metadata.group || "Otros Activos", type: metadata.legacyType || a.type, value: asNumber(a.current_value), cost: asNumber(a.cost_basis) };
-  });
+  }) : (fallback.assets || []).map(function(a) { return Object.assign({}, a); });
+
   return {
     version: 1,
-    profile: fallback.profile || {},
+    profile: Object.assign({}, fallback.profile || {}),
     accounts: accounts,
     assets: assets,
-    debts: (rows.liabilities || []).map(function(d) {
+    debts: dbLiabilities.length ? dbLiabilities.map(function(d) {
       return { id: d.legacy_id || d.id, name: d.name, type: d.type, balance: asNumber(d.outstanding_balance), currency: d.currency || "EUR" };
-    }),
-    transactions: dedupeTransactions((rows.transactions || []).map(function(t) {
+    }) : (fallback.debts || []).map(function(d) { return Object.assign({}, d); }),
+    transactions: dbTransactions.length ? dedupeTransactions(dbTransactions.map(function(t) {
       return { id: t.legacy_id || t.id, date: t.date, merchant: t.merchant || t.description, description: t.description, amount: asNumber(t.amount), type: t.type, category: t.category_name || "Otros", subcategory: t.subcategory || "", accountId: t.account_legacy_id, destinationAccountId: t.destination_account_legacy_id || "", source: t.source || "manual", notes: t.notes || "", importId: t.legacy_import_id || "" };
-    })),
-    goals: (rows.goals || []).map(function(g) {
+    })) : (fallback.transactions || []).map(function(t) { return Object.assign({}, t); }),
+    goals: dbGoals.length ? dbGoals.map(function(g) {
       return { id: g.legacy_id || g.id, name: g.name, target: asNumber(g.target_amount), current: asNumber(g.current_amount), date: g.target_date, priority: g.priority || "Media", status: g.status || "active" };
-    }),
-    imports: (rows.imports || []).map(function(i) {
+    }) : (fallback.goals || []).map(function(g) { return Object.assign({}, g); }),
+    imports: dbImports.length ? dbImports.map(function(i) {
       const meta = i.raw_metadata || {};
       return { id: i.legacy_id || i.id, fileName: i.file_name, createdAt: String(i.created_at || "").slice(0, 10), count: meta.count || 0, ids: meta.ids || [], status: i.status };
-    }),
-    snapshots: (rows.wealth_snapshots || []).map(function(s) {
+    }) : (fallback.imports || []).map(function(i) { return Object.assign({}, i); }),
+    snapshots: dbSnapshots.length ? dbSnapshots.map(function(s) {
       return { month: s.metadata && s.metadata.month ? s.metadata.month : String(s.snapshot_date).slice(0, 7), value: asNumber(s.net_worth) };
-    })
+    }) : (fallback.snapshots || []).map(function(s) { return Object.assign({}, s); })
   };
 }
