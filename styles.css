@@ -177,6 +177,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .view { animation: view-in .22s ease; }
 @keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
+.app-footer {
+  padding: 0 clamp(22px, 4vw, 56px) 32px;
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.backend-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin: -10px 0 20px;
+  padding: 9px 11px;
+  border: 1px solid rgba(102, 167, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(102, 167, 255, 0.07);
+  color: #c8d9ff;
+  font-size: 12px;
+}
+
+.backend-status [data-icon] { width: 16px; height: 16px; color: var(--blue); }
+.backend-status.backend-online { border-color: rgba(69, 196, 106, 0.24); background: var(--green-soft); color: #bdf2cc; }
+.backend-status.backend-online [data-icon] { color: var(--green); }
+
 .view-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
 .view-head h1 { margin: 4px 0 0; font-size: clamp(25px, 3vw, 33px); line-height: 1.15; letter-spacing: 0; }
 .view-head p { max-width: 620px; margin: 7px 0 0; color: var(--muted); }
@@ -499,6 +524,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .review-table td { padding: 7px; }
 .source-warning { padding: 14px; border: 1px solid rgba(242,184,75,.3); border-radius: 8px; background: rgba(242,184,75,.08); color: #f5d491; font-size: 12px; }
 .source-warning strong { display: block; margin-bottom: 3px; color: #ffe0a3; }
+.settings-backend { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding: 13px; border: 1px solid var(--line-soft); border-radius: 9px; background: var(--bg-raised); }
+.settings-backend strong, .settings-backend span, .settings-backend small { display: block; }
+.settings-backend strong { font-size: 13px; }
+.settings-backend span { color: var(--muted); font-size: 12px; }
+.settings-backend small { margin-top: 2px; color: var(--subtle); font-size: 11px; }
 
 #toast-root { display: grid; gap: 8px; position: fixed; right: 20px; bottom: 22px; z-index: 100; }
 .toast { display: flex; align-items: center; gap: 9px; max-width: 350px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 9px; background: #181b20; color: var(--text); box-shadow: var(--shadow); font-size: 13px; animation: toast-in .2s ease; }
@@ -525,6 +555,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .topbar { min-height: 66px; padding: 0 18px; }
   .mobile-menu { display: inline-grid; }
   #app-view { padding: 27px 18px 104px; }
+  .app-footer { padding: 0 18px 100px; }
   .mobile-nav { display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; position: fixed; right: 0; bottom: 0; left: 0; height: 77px; padding: 8px 11px 9px; border-top: 1px solid var(--line); background: rgba(12,14,18,.96); z-index: 30; backdrop-filter: blur(16px); }
   .mobile-nav-item { display: grid; align-content: center; justify-items: center; gap: 4px; height: 58px; background: transparent; color: var(--subtle); font-size: 9px; }
   .mobile-nav-item [data-icon] { width: 19px; height: 19px; }
@@ -577,6 +608,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .goals-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .form-field.full { grid-column: auto; }
+  .settings-backend { align-items: stretch; flex-direction: column; }
   .modal-backdrop { padding: 0; align-items: end; }
   .modal { width: 100%; max-height: 90vh; border-bottom: 0; border-right: 0; border-left: 0; border-radius: 16px 16px 0 0; }
   .modal-head { padding: 18px 17px 14px; }

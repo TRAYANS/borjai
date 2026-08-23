@@ -1,4 +1,4 @@
-export const CATEGORIES = ["Vivienda","Alimentacion","Gasolina","Transporte","Ocio","Restaurantes","Compras","Suscripciones","Viajes","Salud","Seguros","Formacion","Tecnologia","Otros"];
+export const CATEGORIES = ["Vivienda","Alimentacion","Restaurantes","Gasolina","Transporte","Ocio","Compras","Suscripciones","Viajes","Salud","Seguros","Formacion","Tecnologia","Inversiones","Criptomonedas","Impuestos","Otros"];
 
 function clean(n) {
   return String(n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -10,7 +10,7 @@ function iso(d) {
 
 export function classify(text) {
   const n = clean(text);
-  const rules = [["mercadona|carrefour|lidl|alcampo","Alimentacion"],["repsol|cepsa|shell","Gasolina"],["uber|cabify|renfe|metro","Transporte"],["netflix|spotify|icloud|adobe|youtube|hbo|disney","Suscripciones"],["alquiler|hipoteca|comunidad","Vivienda"],["zara|amazon|ikea|decathlon","Compras"],["restaurante|glovo|just eat|bar |cafe","Restaurantes"],["mapfre|mutua|adeslas|sanitas","Seguros"],["farmacia|dent|medic","Salud"]];
+  const rules = [["mercadona|carrefour|lidl|alcampo","Alimentacion"],["restaurante|glovo|just eat|bar |cafe","Restaurantes"],["repsol|cepsa|shell","Gasolina"],["uber|cabify|renfe|metro","Transporte"],["netflix|spotify|icloud|adobe|youtube|hbo|disney","Suscripciones"],["alquiler|hipoteca|comunidad","Vivienda"],["zara|amazon|ikea|decathlon","Compras"],["mapfre|mutua|adeslas|sanitas","Seguros"],["farmacia|dent|medic","Salud"],["hacienda|aeat|impuesto|tribut","Impuestos"],["myinvestor|indexa|degiro|ibkr|interactive brokers","Inversiones"],["coinbase|binance|kraken","Criptomonedas"]];
   const rule = rules.find(function(r) { return new RegExp(r[0]).test(n); });
   return rule ? rule[1] : "Otros";
 }

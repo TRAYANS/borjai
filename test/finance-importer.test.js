@@ -38,6 +38,19 @@ test("calcula ahorro y tasa de ahorro mensual", function() {
   assert.equal(result.rate, 0.4);
 });
 
+test("las transferencias no cuentan como ingreso ni gasto", function() {
+  const result = metrics(baseState({
+    transactions: [
+      { id: "i1", date: "2026-08-01", amount: 2000, type: "income", category: "Ingresos", accountId: "bank" },
+      { id: "e1", date: "2026-08-03", amount: -500, type: "expense", category: "Ocio", accountId: "bank" },
+      { id: "tr1", date: "2026-08-04", amount: -300, type: "transfer", category: "Transferencias", accountId: "bank", destinationAccountId: "cash" }
+    ]
+  }), "2026-08");
+  assert.equal(result.income, 2000);
+  assert.equal(result.expense, 500);
+  assert.equal(result.savings, 1500);
+});
+
 test("la tasa de ahorro es 0 si no hay ingresos", function() {
   const result = metrics(baseState({ transactions: [{ id: "e1", date: "2026-08-03", amount: -100, type: "expense", category: "Ocio", accountId: "bank" }] }), "2026-08");
   assert.equal(result.income, 0);
@@ -71,6 +84,8 @@ test("recomienda mantener liquidez si la reserva no esta cubierta", function() {
   const state = baseState({ accounts: [{ id: "bank", name: "Banco", kind: "bank", balance: 100 }] });
   const result = recommendation(state, "2026-08", formatters);
   assert.equal(result.main, "Mantener efectivo");
+  assert.equal(result.decision, "mantener_liquidez");
+  assert.ok(result.metrics.reserveTarget > result.metrics.liquidity);
 });
 
 test("recomienda no invertir si el ahorro es negativo", function() {
@@ -83,10 +98,13 @@ test("recomienda no invertir si el ahorro es negativo", function() {
   });
   const result = recommendation(state, "2026-08", formatters);
   assert.equal(result.main, "No invertir hoy");
+  assert.equal(result.decision, "no_invertir");
 });
 
 test("recomienda aportar si hay ahorro y reserva suficiente", function() {
   const state = baseState({ accounts: [{ id: "bank", name: "Banco", kind: "bank", balance: 10000 }] });
   const result = recommendation(state, "2026-08", formatters);
   assert.equal(result.main, "Aportar 280 EUR");
+  assert.equal(result.decision, "invertir");
+  assert.ok(Array.isArray(result.reasons));
 });

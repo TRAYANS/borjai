@@ -1,9 +1,12 @@
-import { createLocalStorageRepository } from "./src/storage.js";
+import { LOCAL_STORAGE_KEY } from "./src/config.js";
+import { createFinancialApi } from "./src/api/financialApi.js";
 import { CATEGORIES, parseCsv as parseCsvText, parseNumber } from "./src/importer.js";
 import * as finance from "./src/finance.js";
 import { buildLocalCoachAnswer } from "./src/coach.js";
+import { buildFinancialContext } from "./src/financial-context.js";
+import { appSignature } from "./src/version.js";
 
-const KEY = "borjai:mvp:v1";
+const KEY = LOCAL_STORAGE_KEY;
 const ICONS = {
   home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   arrows:'<path d="M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3"/>',
@@ -31,8 +34,8 @@ let currentView = "inicio";
 let stagedImport = null;
 let chat = [];
 let filter = { search:"", type:"all" };
-let repository = createLocalStorageRepository(KEY, seed);
-let state = load();
+let api = await createFinancialApi({ localKey: KEY, fallbackFactory: seed });
+let state = await load();
 
 function icon(name) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.info) + '</svg>'; }
 function hydrate(scope) { (scope || document).querySelectorAll("[data-icon]").forEach(function(n){ n.innerHTML = icon(n.dataset.icon); }); }
@@ -99,8 +102,19 @@ function seed() {
     imports:[], snapshots:snapshots
   };
 }
-function load(){ return repository.load(); }
-function save(){ repository.save(state); }
+async function load(){ return api.load(); }
+function save(){
+  api.saveState(state).then(function(next){ state = next; renderVersion(); }).catch(function(e){ toast(e.message || "No se pudo guardar.", true); });
+}
+async function resetState(){
+  try{
+    state = await api.reset();
+    chat = [];
+    close();
+    render();
+    toast("Datos de ejemplo restablecidos.");
+  }catch(e){toast(e.message||"No se pudo restablecer.",true);}
+}
 
 function account(id){ return finance.account(state,id); }
 function accountName(id){ return account(id) ? account(id).name : "Sin cuenta"; }
@@ -128,12 +142,21 @@ function alertList(){
 }
 function snapshot(){ const key=nowMonth(), existing=state.snapshots.find(function(s){return s.month===key;}); if(existing) existing.value=wealth(); else state.snapshots.push({month:key,value:wealth()}); state.snapshots=state.snapshots.slice(-12); }
 function dot(score){return score>=75?"good":score>=50?"warn":"danger";}
-function typeName(t){return {income:"Ingreso",expense:"Gasto",investment_buy:"Inversion",investment_sell:"Venta",dividend:"Dividendo",fee:"Comision"}[t]||"Movimiento";}
+function typeName(t){return {income:"Ingreso",expense:"Gasto",investment_buy:"Inversion",investment_sell:"Venta",investment:"Inversion",transfer:"Transferencia",dividend:"Dividendo",fee:"Comision"}[t]||"Movimiento";}
 function badge(t){const cls=t==="income"||t==="dividend"?"badge-income":t==="expense"||t==="fee"?"badge-expense":"badge-investment";return '<span class="badge '+cls+'">'+typeName(t)+'</span>';}
 function head(kicker,title,copy,actions){return '<header class="view-head"><div><div class="section-kicker">'+kicker+'</div><h1>'+title+'</h1>'+(copy?'<p>'+copy+'</p>':"")+'</div>'+(actions?'<div class="view-head-actions">'+actions+'</div>':"")+'</header>';}
 function ring(score){return '<div class="health-ring" style="--score:'+score+'"><div class="health-ring-content"><small>Salud<br>financiera</small><strong>'+score+'</strong><span>/100</span></div></div>';}
 function metric(label,value,note,ico,tone){return '<article class="metric-panel"><div class="metric-panel-top"><span class="metric-label">'+label+'</span><span data-icon="'+ico+'"></span></div><strong class="metric-panel-value">'+value+'</strong><div class="metric-panel-note '+(tone||"")+'">'+note+'</div></article>';}
 function coachVisual(className){return '<div class="'+className+'" aria-hidden="true"><span>B</span><i>AI</i></div>';}
+function backendNotice(){
+  const status=api.backendStatus();
+  if(status.connected) return '<div class="backend-status backend-online"><span data-icon="check"></span><span>Backend conectado · Supabase</span></div>';
+  return '<div class="backend-status"><span data-icon="info"></span><span>Modo local activo. Tus datos siguen en este navegador.'+(status.error?" "+safe(status.error):"")+'</span></div>';
+}
+function renderVersion(){
+  const el=document.getElementById("app-version");
+  if(el) el.textContent=appSignature();
+}
 function chart(){
   const values=state.snapshots.map(function(s){return s.value;}), max=Math.max.apply(null,values)*1.04, min=Math.min.apply(null,values)*.96, W=700,H=230,L=35,R=10,T=15,B=33;
   const p=values.map(function(v,i){return {x:L+(W-L-R)*i/(values.length-1),y:T+(H-T-B)*(1-(v-min)/(max-min))};});
@@ -162,7 +185,7 @@ function dashboard(){
   let acc=0, vars=allocation.map(function(a,i){acc+=a.value;return "--c"+(i+1)+":"+a.color+";--p"+(i+1)+":"+(acc/total*100).toFixed(2)+"%;";}).join("");
   const rows=allocation.map(function(a){return '<div class="allocation-row"><i style="--color:'+a.color+'"></i><span>'+a.name+'</span><strong>'+money(a.value)+' <span class="panel-note">'+percent(a.value/total)+'</span></strong></div>';}).join("");
   const quick=[["Donde invierto este mes?","inversion","trend"],["Como va mi patrimonio?","patrimonio","chart"],["Que gastos puedo recortar?","gastos","receipt"],["Riesgos detectados","riesgos","alert"]].map(function(q){return '<button class="quick-chip" data-action="ask" data-q="'+q[1]+'"><span data-icon="'+q[2]+'"></span>'+q[0]+'</button>';}).join("");
-  return '<section class="view">'+head("Panel de control","Tu dinero, con contexto","Asi estas en "+labelMonth(nowMonth()),'<button class="btn" data-action="movement"><span data-icon="plus"></span>Registrar movimiento</button><button class="btn btn-primary" data-view="importar"><span data-icon="upload"></span>Anadir informacion</button>')+
+  return '<section class="view">'+head("Panel de control","Tu dinero, con contexto","Asi estas en "+labelMonth(nowMonth()),'<button class="btn" data-action="movement"><span data-icon="plus"></span>Registrar movimiento</button><button class="btn btn-primary" data-view="importar"><span data-icon="upload"></span>Anadir informacion</button>')+backendNotice()+
     '<div class="dashboard-grid"><div class="hero-metrics"><section class="wealth-panel"><div class="metric-label">Patrimonio neto</div><div class="wealth-value">'+money(w)+'</div><div class="metric-delta '+(change<0?"is-down":"")+'"><strong>'+signed(change)+" ("+percent(change/prior)+')</strong><span>este mes</span></div><p class="metric-subline"><b>'+money(m.savings)+'</b> de ahorro, <b>'+money(m.invested)+'</b> aportados a cartera.</p>'+miniChart()+'</section><section class="health-panel">'+ring(h.score)+'<p class="health-caption">'+(h.score>=75?"Base financiera solida":"Hay palancas claras de mejora")+'</p></section></div>'+
     '<div class="dashboard-two"><section class="chart-panel"><div class="panel-head"><div><h2 class="panel-title">Evolucion del patrimonio</h2><span class="panel-note">Ultimos 12 meses</span></div><select class="period-select"><option>12 meses</option></select></div>'+chart()+'</section><section class="recommendation-panel"><div class="recommendation-top"><div class="recommendation-icon"><span data-icon="sparkles"></span></div><div><div class="section-kicker">Que haria hoy</div><h2>'+r.title+'</h2></div></div><p>'+r.text+'</p><div class="recommendation-facts"><div class="fact"><span>Propuesta</span><strong>'+r.main+'</strong></div><div class="fact"><span>Margen liquido</span><strong>'+r.detail+'</strong></div></div><div class="disclaimer">Analisis con tus datos locales. No incluye cotizaciones ni noticias en tiempo real.</div></section></div>'+
     '<section class="distribution-panel"><div class="panel-head"><div><h2 class="panel-title">Distribucion del patrimonio</h2><span class="panel-note">Activos menos deudas</span></div><button class="text-button" data-view="patrimonio">Ver patrimonio</button></div><div class="distribution-content"><div class="donut-wrap"><div class="donut" style="'+vars+'"></div><div class="donut-total"><strong>'+money(w)+'</strong><span>Total</span></div></div><div class="allocation-list">'+rows+'</div></div></section>'+
@@ -174,7 +197,7 @@ function movements(){
   const m=metrics(nowMonth()), list=state.transactions.filter(function(t){return (filter.type==="all"||t.type===filter.type) && (!filter.search||clean(t.merchant+" "+t.description+" "+t.category).includes(clean(filter.search)));}).sort(function(a,b){return b.date.localeCompare(a.date);});
   return '<section class="view">'+head("Registro financiero","Movimientos","Anade, revisa y clasifica cada entrada. Invertir no se contabiliza como gasto.",'<button class="btn" data-view="importar"><span data-icon="upload"></span>Importar archivo</button><button class="btn btn-primary" data-action="movement"><span data-icon="plus"></span>Nuevo movimiento</button>')+
   '<div class="summary-row"><article class="summary-stat"><span>Ingresos del mes</span><strong>'+money(m.income)+'</strong><small>Dinero que entra</small></article><article class="summary-stat"><span>Gastos del mes</span><strong>'+money(m.expense)+'</strong><small>Consumo y recibos</small></article><article class="summary-stat"><span>Ahorro generado</span><strong>'+money(m.savings)+'</strong><small>'+percent(m.rate)+' de tasa de ahorro</small></article><article class="summary-stat"><span>Aportado a cartera</span><strong>'+money(m.invested)+'</strong><small>Movimiento entre activos</small></article></div>'+
-  '<section class="table-shell" style="margin-top:18px"><div class="table-toolbar"><div class="toolbar-filters"><input class="search-field" id="search" placeholder="Buscar concepto" value="'+safe(filter.search)+'"><select class="filter-select" id="type-filter"><option value="all">Todos los tipos</option><option value="income"'+(filter.type==="income"?" selected":"")+'>Ingresos</option><option value="expense"'+(filter.type==="expense"?" selected":"")+'>Gastos</option><option value="investment_buy"'+(filter.type==="investment_buy"?" selected":"")+'>Inversiones</option></select></div><span class="panel-note">'+list.length+' movimientos</span></div>'+table(list,true)+'</section></section>';
+  '<section class="table-shell" style="margin-top:18px"><div class="table-toolbar"><div class="toolbar-filters"><input class="search-field" id="search" placeholder="Buscar concepto" value="'+safe(filter.search)+'"><select class="filter-select" id="type-filter"><option value="all">Todos los tipos</option><option value="income"'+(filter.type==="income"?" selected":"")+'>Ingresos</option><option value="expense"'+(filter.type==="expense"?" selected":"")+'>Gastos</option><option value="investment_buy"'+(filter.type==="investment_buy"?" selected":"")+'>Inversiones</option><option value="transfer"'+(filter.type==="transfer"?" selected":"")+'>Transferencias</option></select></div><span class="panel-note">'+list.length+' movimientos</span></div>'+table(list,true)+'</section></section>';
 }
 function bars(items){
   if(!items.length) return '<div class="table-empty">Aun no hay gastos este mes.</div>';
@@ -208,22 +231,10 @@ function healthView(){
   const h=health(); return '<section class="view">'+head("Diagnostico","Como estas","La puntuacion usa reglas visibles sobre ahorro, liquidez, riesgo y objetivos.")+'<div class="health-layout"><section class="health-summary panel">'+ring(h.score)+'<p class="health-caption">'+(h.score>=80?"La situacion mejora. Vigila gasto discrecional antes de elevar riesgo.":"Hay margen para mejorar la base: ahorro, liquidez y gasto.")+'</p></section><section class="panel" style="padding:18px"><div class="panel-head"><div><h2 class="panel-title">Componentes de la puntuacion</h2><span class="panel-note">Cada punto es explicable</span></div></div><div class="health-list">'+h.parts.map(function(p){return '<div class="health-row"><i class="status-dot '+dot(p.score)+'"></i><span>'+p.label+'</span><strong>'+Math.round(p.score)+'/100</strong><small>'+p.note+'</small></div>';}).join("")+'</div></section></div></section>';
 }
 function coachContext(){
-  const h=health(),m=h.metrics;
-  return {
-    currency:"EUR",
-    patrimonio_neto:Math.round(wealth()),
-    liquidez:Math.round(h.liquid),
-    reserva_objetivo:Math.round(h.target),
-    salud_financiera:h.score,
-    ingresos_mes:Math.round(m.income),
-    gastos_mes:Math.round(m.expense),
-    ahorro_mes:Math.round(m.savings),
-    tasa_ahorro:Math.round(m.rate*1000)/10,
-    aportaciones_mes:Math.round(m.invested),
-    distribucion:allocations().map(function(a){return {activo:a.name,valor:Math.round(a.value),porcentaje:Math.round(a.value/wealth()*1000)/10};}),
-    objetivos:state.goals.map(function(g){return {nombre:g.name,actual:Math.round(g.current),objetivo:Math.round(g.target),fecha:g.date};}),
-    alertas:alertList().filter(function(a){return a.level!=="good";}).map(function(a){return a.title;})
-  };
+  const context=buildFinancialContext(state,nowMonth(),{money:money,percent:percent});
+  context.recomendacion=recommendation();
+  context.alertas=alertList().filter(function(a){return a.level!=="good";}).map(function(a){return a.title;});
+  return context;
 }
 function answer(q){
   return buildLocalCoachAnswer(q,{
@@ -246,12 +257,12 @@ function coach(){
 function imports(){
   const history=state.imports.length?state.imports.slice().reverse().map(function(i){return '<div class="history-row"><div><strong>'+safe(i.fileName)+'</strong><span>'+date(i.createdAt)+" · "+i.count+" movimientos confirmados</span></div><button class=\"btn btn-small btn-danger\" data-action=\"undo\" data-id=\""+i.id+"\">Deshacer</button></div>";}).join(""):'<div class="empty-state"><span data-icon="upload"></span><p>Aun no has confirmado ninguna importacion.</p></div>';
   return '<section class="view">'+head("Entrada de datos","Importar informacion","El archivo se revisa antes de tocar tus datos financieros.",'<button class="btn" data-action="movement"><span data-icon="plus"></span>Entrada manual</button>')+
-  '<div class="import-layout"><label class="drop-zone" id="drop-zone"><input id="file-input" type="file" accept=".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png" multiple><div class="drop-zone-icon"><span data-icon="upload"></span></div><h2>Arrastra un archivo aqui</h2><p>Extractos, movimientos, informes o capturas. CSV se analiza localmente; los demas formatos pasan al importador seguro al conectar el backend.</p><small>PDF, CSV, XLSX, JPG, JPEG y PNG</small></label><aside class="import-info panel"><div class="section-kicker">Flujo protegido</div><h2>Nada se incorpora sin tu visto bueno</h2><p>La importacion crea una propuesta editable. Solo al confirmar se guardan movimientos.</p><div class="flow-steps"><div class="flow-step"><i class="flow-number">1</i><div><strong>Archivo</strong>Seleccionas la fuente.</div></div><div class="flow-step"><i class="flow-number">2</i><div><strong>Extraccion</strong>Se obtienen candidatos estructurados.</div></div><div class="flow-step"><i class="flow-number">3</i><div><strong>Revision</strong>Corriges fecha, concepto, importe o categoria.</div></div><div class="flow-step"><i class="flow-number">4</i><div><strong>Confirmacion</strong>Se registra el lote y se puede deshacer.</div></div></div></aside></div><section class="import-history panel"><h2>Historial de importaciones</h2>'+history+'</section></section>';
+  backendNotice()+'<div class="import-layout"><label class="drop-zone" id="drop-zone"><input id="file-input" type="file" accept=".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png" multiple><div class="drop-zone-icon"><span data-icon="upload"></span></div><h2>Arrastra un archivo aqui</h2><p>Extractos, movimientos, informes o capturas. CSV se analiza localmente; los demas formatos pasan al importador seguro al conectar el backend.</p><small>PDF, CSV, XLSX, JPG, JPEG y PNG</small></label><aside class="import-info panel"><div class="section-kicker">Flujo protegido</div><h2>Nada se incorpora sin tu visto bueno</h2><p>La importacion crea una propuesta editable. Solo al confirmar se guardan movimientos.</p><div class="flow-steps"><div class="flow-step"><i class="flow-number">1</i><div><strong>Archivo</strong>Seleccionas la fuente.</div></div><div class="flow-step"><i class="flow-number">2</i><div><strong>Extraccion</strong>Se obtienen candidatos estructurados.</div></div><div class="flow-step"><i class="flow-number">3</i><div><strong>Revision</strong>Corriges fecha, concepto, importe o categoria.</div></div><div class="flow-step"><i class="flow-number">4</i><div><strong>Confirmacion</strong>Se registra el lote y se puede deshacer.</div></div></div></aside></div><section class="import-history panel"><h2>Historial de importaciones</h2>'+history+'</section></section>';
 }
 
 function render(){
   const map={inicio:dashboard,movimientos:movements,gastos:expenses,patrimonio:patrimonio,inversiones:investments,objetivos:goals,coach:coach,importar:imports,salud:healthView};
-  document.getElementById("app-view").innerHTML=(map[currentView]||dashboard)(); hydrate(document.getElementById("app-view")); nav(); topbar(); dropZone();
+  document.getElementById("app-view").innerHTML=(map[currentView]||dashboard)(); hydrate(document.getElementById("app-view")); nav(); topbar(); dropZone(); renderVersion();
 }
 function nav(){
   document.querySelectorAll("[data-view]").forEach(function(n){n.classList.toggle("is-active",n.dataset.view===currentView);});
@@ -267,7 +278,7 @@ function close(){document.getElementById("modal-root").innerHTML="";}
 function toast(text,error){const r=document.getElementById("toast-root"),n=document.createElement("div");n.className="toast"+(error?" error":"");n.innerHTML='<span data-icon="'+(error?"alert":"check")+'"></span><span>'+safe(text)+'</span>';r.appendChild(n);hydrate(n);setTimeout(function(){n.remove();},3600);}
 function movementModal(invest){
   const accounts=state.accounts.map(function(a){return '<option value="'+a.id+'">'+safe(a.name)+'</option>';}).join(""), cats=CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join("");
-  modal('<header class="modal-head"><div><div class="section-kicker">Registro manual</div><h2>Nuevo movimiento</h2><p>Ingresos, gastos e inversiones se tratan de forma distinta.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="movement-form"><div class="modal-body"><div class="form-grid"><div class="form-field full"><label>Concepto</label><input name="merchant" required placeholder="Ej. MERCADONA o Nomina"></div><div class="form-field"><label>Tipo</label><select name="type"><option value="income">Ingreso</option><option value="expense">Gasto</option><option value="investment_buy"'+(invest?" selected":"")+'>Aportacion a inversion</option><option value="investment_sell">Venta de inversion</option></select></div><div class="form-field"><label>Importe</label><input name="amount" type="number" min=".01" step=".01" required></div><div class="form-field"><label>Fecha</label><input name="date" type="date" value="'+iso(new Date())+'" required></div><div class="form-field"><label>Cuenta</label><select name="accountId">'+accounts+'</select></div><div class="form-field"><label>Categoria</label><select name="category">'+cats+'</select></div><div class="form-field full"><label>Nota opcional</label><textarea name="description"></textarea></div></div><p class="form-hint">Una aportacion mueve dinero de liquidez a cartera: no reduce ahorro ni se marca como gasto.</p></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar movimiento</button></footer></form>');
+  modal('<header class="modal-head"><div><div class="section-kicker">Registro manual</div><h2>Nuevo movimiento</h2><p>Ingresos, gastos, inversiones y transferencias se tratan de forma distinta.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="movement-form"><div class="modal-body"><div class="form-grid"><div class="form-field full"><label>Concepto</label><input name="merchant" required placeholder="Ej. MERCADONA o Nomina"></div><div class="form-field"><label>Tipo</label><select name="type"><option value="income">Ingreso</option><option value="expense">Gasto</option><option value="investment_buy"'+(invest?" selected":"")+'>Aportacion a inversion</option><option value="investment_sell">Venta de inversion</option><option value="transfer">Transferencia</option></select></div><div class="form-field"><label>Importe</label><input name="amount" type="number" min=".01" step=".01" required></div><div class="form-field"><label>Fecha</label><input name="date" type="date" value="'+iso(new Date())+'" required></div><div class="form-field"><label>Cuenta origen</label><select name="accountId">'+accounts+'</select></div><div class="form-field"><label>Cuenta destino</label><select name="destinationAccountId"><option value="">Sin destino</option>'+accounts+'</select></div><div class="form-field"><label>Categoria</label><select name="category">'+cats+'</select></div><div class="form-field full"><label>Nota opcional</label><textarea name="description"></textarea></div></div><p class="form-hint">Una transferencia mueve dinero entre cuentas: no cuenta como ingreso ni gasto real.</p></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar movimiento</button></footer></form>');
 }
 function goalModal(id){
   const g=state.goals.find(function(x){return x.id===id;});
@@ -275,7 +286,8 @@ function goalModal(id){
 }
 function accountModal(){modal('<header class="modal-head"><div><div class="section-kicker">Patrimonio</div><h2>Anadir cuenta o efectivo</h2><p>El saldo entra en la parte liquida del patrimonio.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="account-form"><div class="modal-body"><div class="form-grid"><div class="form-field"><label>Nombre</label><input name="name" required></div><div class="form-field"><label>Tipo</label><select name="kind"><option value="bank">Cuenta bancaria</option><option value="cash">Efectivo</option><option value="broker">Broker</option></select></div><div class="form-field full"><label>Saldo actual</label><input name="balance" type="number" min="0" step=".01" required></div></div></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Anadir cuenta</button></footer></form>');}
 function settings(){
-  modal('<header class="modal-head"><div><div class="section-kicker">Configuracion</div><h2>Preferencias financieras</h2><p>Estas reglas alimentan la lectura local del Coach.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="settings-form"><div class="modal-body"><div class="form-grid"><div class="form-field"><label>Tu nombre</label><input name="name" required value="'+safe(state.profile.name)+'"></div><div class="form-field"><label>Perfil de riesgo</label><select name="risk"><option'+(state.profile.risk==="Conservador"?" selected":"")+'>Conservador</option><option'+(state.profile.risk==="Moderado"?" selected":"")+'>Moderado</option><option'+(state.profile.risk==="Dinamico"?" selected":"")+'>Dinamico</option></select></div><div class="form-field"><label>Meses de emergencia</label><input name="emergency" type="number" min="1" max="12" required value="'+state.profile.emergency+'"></div><div class="form-field"><label>Aportacion mensual</label><input name="contribution" type="number" min="0" step="10" required value="'+state.profile.contribution+'"></div></div><button class="btn btn-small btn-danger" style="margin-top:20px" type="button" data-action="reset"><span data-icon="refresh"></span>Restablecer datos de ejemplo</button></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar cambios</button></footer></form>');
+  const status=api.backendStatus(),migration=api.migrationStatus();
+  modal('<header class="modal-head"><div><div class="section-kicker">Configuracion</div><h2>Preferencias financieras</h2><p>Estas reglas alimentan la lectura local del Coach.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="settings-form"><div class="modal-body"><div class="form-grid"><div class="form-field"><label>Tu nombre</label><input name="name" required value="'+safe(state.profile.name)+'"></div><div class="form-field"><label>Perfil de riesgo</label><select name="risk"><option'+(state.profile.risk==="Conservador"?" selected":"")+'>Conservador</option><option'+(state.profile.risk==="Moderado"?" selected":"")+'>Moderado</option><option'+(state.profile.risk==="Dinamico"?" selected":"")+'>Dinamico</option></select></div><div class="form-field"><label>Meses de emergencia</label><input name="emergency" type="number" min="1" max="12" required value="'+state.profile.emergency+'"></div><div class="form-field"><label>Aportacion mensual</label><input name="contribution" type="number" min="0" step="10" required value="'+state.profile.contribution+'"></div></div><section class="settings-backend"><div><strong>Persistencia</strong><span>'+(status.connected?"Supabase conectado":"Modo local con fallback seguro")+'</span>'+(migration?'<small>Ultima migracion: '+(migration.ok?"correcta":"pendiente")+'</small>':"")+'</div><button class="btn btn-small" type="button" data-action="migrate-local"><span data-icon="upload"></span>Migrar localStorage</button></section><button class="btn btn-small btn-danger" style="margin-top:20px" type="button" data-action="reset"><span data-icon="refresh"></span>Restablecer datos de ejemplo</button></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar cambios</button></footer></form>');
 }
 function alertsModal(){const list=alertList();modal('<header class="modal-head"><div><div class="section-kicker">Alertas inteligentes</div><h2>Solo lo que requiere atencion</h2><p>Cada aviso esta vinculado a tus datos.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><div class="modal-body"><div class="insight-list">'+list.map(function(a){return '<div class="health-row"><i class="status-dot '+(a.level==="good"?"":a.level)+'"></i><span>'+a.title+'</span><strong>'+ (a.level==="good"?"Estable":"Revisar") +'</strong><small>'+a.text+'</small></div>';}).join("")+'</div></div><footer class="modal-foot"><button class="btn btn-primary" data-action="close-modal">Entendido</button></footer>');}
 function parseCsv(text,file){ return parseCsvText(text,file,state.accounts[0].id); }
@@ -291,11 +303,13 @@ function review(){
 function unsupported(files){modal('<header class="modal-head"><div><div class="section-kicker">Importador seguro</div><h2>Archivo preparado para el backend</h2><p>Has seleccionado: '+files.map(function(f){return safe(f.name);}).join(", ")+'</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><div class="modal-body"><div class="source-warning"><strong>Extraccion no disponible en GitHub Pages</strong>PDF, XLSX e imagenes requieren un servicio privado de OCR y parsing. Esta pagina no envia ni guarda el archivo.</div><p class="panel-note" style="margin-top:15px">Al conectar el backend, el archivo se procesara de forma aislada y volvera a esta misma revision antes de confirmar.</p></div><footer class="modal-foot"><button class="btn" data-action="close-modal">Cerrar</button><button class="btn btn-primary" data-action="movement">Registrar manualmente</button></footer>');}
 function effect(t,sign){
   const a=account(t.accountId);if(a)a.balance+=t.amount*sign;
+  if(t.type==="transfer"&&t.destinationAccountId){const destination=account(t.destinationAccountId);if(destination)destination.balance+=Math.abs(t.amount)*sign;}
   if(t.type==="investment_buy"||t.type==="investment_sell"){let asset=state.assets.find(function(x){return x.id==="manual-investment";}),delta=Math.abs(t.amount)*(t.type==="investment_buy"?sign:-sign);if(asset){asset.value+=delta;asset.cost+=delta;if(asset.value<=0)state.assets=state.assets.filter(function(x){return x!==asset;});}else if(delta>0)state.assets.push({id:"manual-investment",name:"Aportaciones registradas",ticker:"",group:"Inversiones",type:"ETF",value:delta,cost:delta});}
 }
 function storeMovement(form){
   const d=new FormData(form),type=d.get("type"),raw=Math.abs(parseNumber(d.get("amount")));if(!Number.isFinite(raw)||raw<=0){toast("Introduce un importe valido.",true);return;}
-  const t={id:uid("t"),date:d.get("date"),merchant:d.get("merchant").trim(),description:d.get("description").trim(),amount:(type==="expense"||type==="investment_buy")?-raw:raw,type:type,category:type==="income"?"Ingresos":type.startsWith("investment")?"Inversiones":d.get("category"),accountId:d.get("accountId")};
+  if(type==="transfer"&&(!d.get("destinationAccountId")||d.get("destinationAccountId")===d.get("accountId"))){toast("Selecciona una cuenta destino distinta para la transferencia.",true);return;}
+  const t={id:uid("t"),date:d.get("date"),merchant:d.get("merchant").trim(),description:d.get("description").trim(),amount:(type==="expense"||type==="investment_buy"||type==="transfer")?-raw:raw,type:type,category:type==="income"?"Ingresos":type==="transfer"?"Transferencias":type.startsWith("investment")?"Inversiones":d.get("category"),accountId:d.get("accountId"),destinationAccountId:d.get("destinationAccountId")};
   state.transactions.push(t);effect(t,1);snapshot();save();close();render();toast("Movimiento guardado y recalculado.");
 }
 function confirmImport(){
@@ -319,10 +333,11 @@ document.addEventListener("click",function(e){
   else if(action==="open-import")go("importar");
   else if(action==="show-alerts")alertsModal();
   else if(action==="alerts")alertsModal();
+  else if(action==="migrate-local"){api.migrateLocalState().then(function(result){toast(result.ok?"Datos locales migrados al backend.":"No se pudo migrar: "+(result.reason||result.errors&&result.errors.join(" ")||"backend no disponible"),!result.ok);settings();}).catch(function(e){toast(e.message||"No se pudo migrar.",true);});}
   else if(action==="ask")ask(b.dataset.q);
   else if(action==="delete"){const t=state.transactions.find(function(x){return x.id===b.dataset.id;});if(t&&confirm("¿Eliminar este movimiento?")){effect(t,-1);state.transactions=state.transactions.filter(function(x){return x!==t;});snapshot();save();render();toast("Movimiento eliminado.");}}
   else if(action==="undo")undo(b.dataset.id);
-  else if(action==="reset"){if(confirm("¿Restablecer todos los datos locales de ejemplo?")){state=repository.reset();chat=[];close();render();toast("Datos de ejemplo restablecidos.");}}
+  else if(action==="reset"){if(confirm("¿Restablecer todos los datos locales de ejemplo?"))resetState();}
 });
 document.addEventListener("change",function(e){
   if(e.target.id==="file-input"){upload(e.target.files);e.target.value="";}
