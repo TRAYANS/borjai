@@ -22,10 +22,10 @@
         <button type="button" class="nav-link" data-view="objetivos"><span data-icon="target"></span>Objetivos</button>
         <button type="button" class="nav-link" data-view="coach"><span data-icon="sparkles"></span>Coach IA</button>
       </nav>
-      <div class="sidebar-bottom"><button type="button" class="import-button" data-action="open-import"><span data-icon="upload"></span><span>Anadir informacion</span></button><button type="button" class="nav-link settings-link" data-action="open-settings"><span data-icon="settings"></span>Configuracion</button></div>
+      <div class="sidebar-bottom"><button type="button" class="import-button" data-action="open-import"><span data-icon="upload"></span><span>Anadir informacion</span></button><button type="button" class="import-button" data-action="open-ai-import"><span data-icon="sparkles"></span><span>Importar con IA</span></button><button type="button" class="nav-link settings-link" data-action="open-settings"><span data-icon="settings"></span>Configuracion</button></div>
     </aside>
     <div class="app-frame">
-      <header class="topbar"><button type="button" class="icon-button mobile-menu" data-action="toggle-menu" aria-label="Abrir navegacion"><span data-icon="menu"></span></button><div class="page-context"><span class="eyebrow">Resumen personal</span><strong id="topbar-title">Buenos dias, Borja</strong></div><div class="topbar-actions"><button type="button" class="icon-button" data-action="open-import" aria-label="Anadir informacion"><span data-icon="plus"></span></button><button type="button" class="notification-button" data-action="show-alerts" aria-label="Ver alertas"><span data-icon="bell"></span><b id="alert-count">0</b></button><button type="button" class="profile-button" data-action="open-settings" aria-label="Abrir configuracion">B</button></div></header>
+      <header class="topbar"><button type="button" class="icon-button mobile-menu" data-action="toggle-menu" aria-label="Abrir navegacion"><span data-icon="menu"></span></button><div class="page-context"><span class="eyebrow">Resumen personal</span><strong id="topbar-title">Buenos dias, Borja</strong></div><div class="topbar-actions"><button type="button" class="icon-button" data-action="open-import" aria-label="Anadir informacion"><span data-icon="plus"></span></button><button type="button" class="icon-button" data-action="open-ai-import" aria-label="Importar con IA"><span data-icon="sparkles"></span></button><button type="button" class="notification-button" data-action="show-alerts" aria-label="Ver alertas"><span data-icon="bell"></span><b id="alert-count">0</b></button><button type="button" class="profile-button" data-action="open-settings" aria-label="Abrir configuracion">B</button></div></header>
       <main id="app-view" tabindex="-1"></main>
       <footer class="app-footer" aria-label="Version de la aplicacion"><span id="app-version"></span></footer>
     </div>
@@ -36,5 +36,6 @@
   <script type="module" src="app.js"></script>
   <script type="module" src="src/markets-state.js"></script>
   <script type="module" src="src/markets.js"></script>
+  <script type="module" src="src/ai-import.js"></script>
 </body>
 </html>
