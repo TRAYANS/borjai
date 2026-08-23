@@ -58,12 +58,100 @@ Responsabilidades:
 
 La eleccion final de proveedores se hara al definir presupuesto, paises soportados, cobertura de activos y requisitos RGPD. Todas esas integraciones se ocultan tras adaptadores para poder sustituirlas.
 
-## Fases
+## Versiones
 
-1. MVP local: dashboard calculado, movimientos, categorias, gastos, patrimonio, inversiones, objetivos, importacion CSV con revision, historial reversible y Coach basado en datos.
-2. Servicio seguro: cuentas, PostgreSQL, importador de PDF/XLSX/imagenes, OCR y Coach con proveedor IA.
-3. Inteligencia: recomendacion diaria con datos de mercado, simulador, alertas y objetivos avanzados.
-4. Conectores: bancos, brokers, exchanges, inmuebles, hipotecas y sincronizacion automatica.
+- V.1.0: base visual estatica.
+- V.1.1: dashboard calculado, movimientos, categorias, gastos, patrimonio, inversiones, objetivos, importacion CSV con revision, historial reversible y Coach basado en datos locales.
+- V.1.2: backend y persistencia real preparados con Supabase/PostgreSQL, repositorios, migracion segura desde `localStorage`, RLS multiusuario y `financialContext` para IA futura. La interfaz sigue siendo la misma app estatica.
+- V.1.3: mejora del motor financiero, categorias, transferencias y analisis de gastos mas profundo.
+- V.2.0: IA real, documentos, mercado, conectores bancarios y patrimonio avanzado.
+
+## V.1.2 Backend y persistencia real
+
+La arquitectura aprobada mantiene GitHub Pages como frontend y usa Supabase como backend gestionado:
+
+```text
+app.js
+    |
+    v
+src/api/financialApi.js
+    |
+    v
+Repository
+    |------------------------|
+    v                        v
+SupabaseRepository      LocalStorageRepository
+    |                        |
+    v                        v
+PostgreSQL + RLS        borjai:mvp:v1 fallback
+```
+
+`app.js` no accede directamente a Supabase. La UI llama a `financialApi`, `financialApi` decide el repositorio activo y los repositorios traducen el estado de BorjaAI a almacenamiento.
+
+El motor financiero se mantiene puro:
+
+```text
+Datos normalizados
+    |
+    v
+src/finance.js
+    |
+    v
+metricas, salud, patrimonio, recomendacion
+```
+
+No conoce `localStorage`, Supabase, SQL, autenticacion ni red.
+
+### Supabase
+
+El esquema inicial vive en `src/db/schema.sql` y se replica en `src/db/migrations/001_initial_schema.sql`.
+
+Tablas iniciales:
+
+- `accounts`
+- `categories`
+- `transactions`
+- `assets`
+- `liabilities`
+- `investments`
+- `goals`
+- `imports`
+- `wealth_snapshots`
+
+Todas las entidades financieras tienen `user_id` y Row Level Security. Las politicas permiten `select`, `insert`, `update` y `delete` solo cuando `auth.uid() = user_id`. `categories` permite lectura de categorias globales con `user_id is null`, pero las categorias de usuario siguen protegidas.
+
+El esquema deja preparados tipos como `transfer`, `real_estate` y `mortgage`, pero V.1.2 no implementa vivienda, hipoteca, OCR, mercado ni IA externa.
+
+### Configuracion publica
+
+GitHub Pages puede cargar configuracion publica desde `window.BORJAI_CONFIG` antes de `app.js`:
+
+```html
+<script>
+  window.BORJAI_CONFIG = {
+    supabaseUrl: "https://TU-PROYECTO.supabase.co",
+    supabaseAnonKey: "TU_ANON_KEY_PUBLICA"
+  };
+</script>
+```
+
+La anon key de Supabase puede estar en cliente si RLS esta bien configurado. Nunca deben incluirse `service_role`, claves privadas, claves de IA ni claves privadas de APIs de mercado en el frontend.
+
+Si no hay configuracion o no hay sesion valida, BorjaAI cae a modo local y conserva los datos en `borjai:mvp:v1`.
+
+### Migracion desde localStorage
+
+La migracion parte de `borjai:mvp:v1` y es defensiva:
+
+1. Lee el estado local.
+2. Valida version, colecciones principales y movimientos.
+3. Guarda una copia en `borjai:mvp:v1:backup:v1.2`.
+4. Normaliza entidades y elimina duplicados por `legacy_id`.
+5. Inserta datos bajo el `user_id` autenticado.
+6. Recarga desde Supabase y compara conteos.
+7. Guarda el resultado en `borjai:migration:v1.2:status`.
+
+El estado local original no se borra. Si el backend falla, la app sigue en modo local.
 
 ## Seguridad desde el inicio
 

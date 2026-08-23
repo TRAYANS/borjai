@@ -1,32 +1,32 @@
 export function account(state, id) {
-  return state.accounts.find(function(a) { return a.id === id; }) || state.accounts[0];
+  return (state.accounts || []).find(function(a) { return a.id === id; }) || (state.accounts || [])[0];
 }
 
 export function group(state, name) {
-  return state.assets.filter(function(a) { return a.group === name; }).reduce(function(sum, a) { return sum + a.value; }, 0);
+  return (state.assets || []).filter(function(a) { return a.group === name; }).reduce(function(sum, a) { return sum + a.value; }, 0);
 }
 
 export function liquid(state) {
-  return state.accounts.reduce(function(sum, a) { return sum + a.balance; }, 0);
+  return (state.accounts || []).reduce(function(sum, a) { return sum + a.balance; }, 0);
 }
 
 export function debt(state) {
-  return state.debts.reduce(function(sum, a) { return sum + a.balance; }, 0);
+  return (state.debts || []).reduce(function(sum, a) { return sum + a.balance; }, 0);
 }
 
 export function wealth(state) {
-  return liquid(state) + state.assets.reduce(function(sum, a) { return sum + a.value; }, 0) - debt(state);
+  return liquid(state) + (state.assets || []).reduce(function(sum, a) { return sum + a.value; }, 0) - debt(state);
 }
 
 export function monthItems(state, key) {
-  return state.transactions.filter(function(t) { return t.date.slice(0, 7) === key; });
+  return (state.transactions || []).filter(function(t) { return t.date && t.date.slice(0, 7) === key; });
 }
 
 export function metrics(state, key) {
   const list = monthItems(state, key);
   const income = list.filter(function(t) { return t.type === "income" || t.type === "dividend"; }).reduce(function(sum, t) { return sum + t.amount; }, 0);
   const expense = list.filter(function(t) { return t.type === "expense" || t.type === "fee"; }).reduce(function(sum, t) { return sum + Math.abs(t.amount); }, 0);
-  const invested = list.filter(function(t) { return t.type === "investment_buy"; }).reduce(function(sum, t) { return sum + Math.abs(t.amount); }, 0);
+  const invested = list.filter(function(t) { return t.type === "investment_buy" || t.type === "investment"; }).reduce(function(sum, t) { return sum + Math.abs(t.amount); }, 0);
   return { income: income, expense: expense, invested: invested, savings: income - expense, rate: income ? (income - expense) / income : 0 };
 }
 
@@ -54,7 +54,8 @@ export function health(state, key, formatters) {
   const divisor = w || 1;
   const max = allocation.reduce(function(n, a) { return Math.max(n, a.value / divisor); }, 0);
   const invested = group(state, "Inversiones") + group(state, "Criptomonedas") + group(state, "Oro y Metales");
-  const progress = state.goals.length ? state.goals.reduce(function(s, g) { return s + Math.min(g.current / g.target, 1); }, 0) / state.goals.length : 0;
+  const goals = state.goals || [];
+  const progress = goals.length ? goals.reduce(function(s, g) { return s + Math.min(g.current / g.target, 1); }, 0) / goals.length : 0;
   const parts = [
     { label: "Ahorro", score: Math.max(0, Math.min(100, m.rate / 0.2 * 100)), note: m.rate >= 0.15 ? "Ritmo saludable" : "Conviene elevar la tasa" },
     { label: "Liquidez", score: Math.max(0, Math.min(100, l / (target || 1) * 100)), note: money(l) + " frente a " + money(target) + " de reserva" },
@@ -72,8 +73,8 @@ export function recommendation(state, key, formatters) {
   const h = health(state, key, formatters);
   const m = h.metrics;
   const extra = Math.max(0, h.liquid - h.target);
-  if (m.savings <= 0) return { title: "Hoy priorizaria ajustar gasto", main: "No invertir hoy", detail: "Ahorro actual " + money(m.savings), text: "Los gastos han superado los ingresos. Antes de aumentar la cartera, protegeria el flujo mensual y revisaria las categorias discrecionales." };
-  if (h.liquid < h.target) return { title: "Hoy mantendria liquidez", main: "Mantener efectivo", detail: "Faltan " + money(h.target - h.liquid), text: "Tu reserva aun no cubre " + state.profile.emergency + " meses de gasto. Destinaria el ahorro a reforzarla antes de asumir mas riesgo." };
+  if (m.savings <= 0) return { decision: "no_invertir", score: 20, reasons: ["Ahorro mensual menor o igual a cero", "Antes de invertir conviene proteger el flujo mensual"], metrics: { savings: m.savings, savingsRate: m.rate, liquidity: h.liquid, reserveTarget: h.target }, title: "Hoy priorizaria ajustar gasto", main: "No invertir hoy", detail: "Ahorro actual " + money(m.savings), text: "Los gastos han superado los ingresos. Antes de aumentar la cartera, protegeria el flujo mensual y revisaria las categorias discrecionales." };
+  if (h.liquid < h.target) return { decision: "mantener_liquidez", score: 55, reasons: ["La reserva de emergencia no esta cubierta", "El ahorro deberia reforzar liquidez antes de asumir riesgo"], metrics: { savings: m.savings, savingsRate: m.rate, liquidity: h.liquid, reserveTarget: h.target }, title: "Hoy mantendria liquidez", main: "Mantener efectivo", detail: "Faltan " + money(h.target - h.liquid), text: "Tu reserva aun no cubre " + state.profile.emergency + " meses de gasto. Destinaria el ahorro a reforzarla antes de asumir mas riesgo." };
   const amount = Math.min(state.profile.contribution, Math.max(100, Math.round(m.savings * 0.35 / 10) * 10));
-  return { title: "Hoy mantendria una aportacion diversificada", main: "Aportar " + money(amount), detail: money(extra) + " por encima de reserva", text: "Tu liquidez cubre la reserva y el mes genera ahorro. Consideraria una aportacion gradual a la cartera sin mover el excedente de golpe." };
+  return { decision: "invertir", score: 78, reasons: ["El mes genera ahorro", "La liquidez cubre la reserva objetivo"], metrics: { savings: m.savings, savingsRate: m.rate, liquidity: h.liquid, reserveTarget: h.target, suggestedAmount: amount }, title: "Hoy mantendria una aportacion diversificada", main: "Aportar " + money(amount), detail: money(extra) + " por encima de reserva", text: "Tu liquidez cubre la reserva y el mes genera ahorro. Consideraria una aportacion gradual a la cartera sin mover el excedente de golpe." };
 }
