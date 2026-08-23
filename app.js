@@ -204,17 +204,96 @@ function renderVersion(){
   if(el) el.textContent=appSignature();
 }
 function chart(){
-  const values=state.snapshots.map(function(s){return s.value;}), max=Math.max.apply(null,values)*1.04, min=Math.min.apply(null,values)*.96, W=700,H=230,L=35,R=10,T=15,B=33;
-  const p=values.map(function(v,i){return {x:L+(W-L-R)*i/(values.length-1),y:T+(H-T-B)*(1-(v-min)/(max-min))};});
-  const line=p.map(function(a,i){return (i?"L":"M")+a.x.toFixed(1)+","+a.y.toFixed(1);}).join(" "), area=line+" L"+p[p.length-1].x+","+(H-B)+" L"+p[0].x+","+(H-B)+" Z";
-  const grid=[0,.33,.66,1].map(function(n){const y=T+(H-T-B)*n;return '<line class="grid" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/><text x="0" y="'+(y+4)+'">'+money(max-(max-min)*n)+'</text>';}).join("");
-  const labels=[0,Math.floor((p.length-1)/2),p.length-1].map(function(i){return '<text x="'+p[i].x+'" y="'+(H-7)+'" text-anchor="middle">'+new Intl.DateTimeFormat("es-ES",{month:"short"}).format(new Date(state.snapshots[i].month+"-01T12:00:00")).replace(".","")+'</text>';}).join("");
-  return '<svg class="line-chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Evolucion del patrimonio"><defs><linearGradient id="wealth-area" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#f32d3a" stop-opacity=".32"/><stop offset="1" stop-color="#f32d3a" stop-opacity="0"/></linearGradient></defs>'+grid+'<path class="area" d="'+area+'"/><path class="line" d="'+line+'"/><circle class="dot" cx="'+p[p.length-1].x+'" cy="'+p[p.length-1].y+'" r="4.8"/>'+labels+'</svg>';
+  const snapshots = Array.isArray(state.snapshots) ? state.snapshots : [];
+
+  if (snapshots.length < 2) {
+    return '<div class="chart-empty">Aún no hay suficientes datos para mostrar la evolución del patrimonio.</div>';
+  }
+
+  const values = snapshots.map(function(s){
+    return Number(s.value) || 0;
+  });
+
+  const maxValue = Math.max.apply(null, values);
+  const minValue = Math.min.apply(null, values);
+  const range = Math.max(maxValue - minValue, 1);
+
+  const max = maxValue + range * 0.04;
+  const min = Math.max(0, minValue - range * 0.04);
+
+  const W=700,H=230,L=35,R=10,T=15,B=33;
+
+  const p = values.map(function(v,i){
+    return {
+      x:L + (i*(W-L-R)/(values.length-1)),
+      y:T + ((max-v)/(max-min))*(H-T-B)
+    };
+  });
+
+  const line = p.map(function(a,i){
+    return (i ? "L" : "M") + a.x + "," + a.y;
+  }).join("");
+
+  const area = line + " L" + p[p.length-1].x + "," + (H-B) + " L" + p[0].x + "," + (H-B) + " Z";
+
+  const grid=[0,.33,.66,1].map(function(n){
+    const y=T+(H-T-B)*n;
+    return '<line class="grid" x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'"/><text x="0" y="'+(y+4)+'">'+money(max-(max-min)*n)+'</text>';
+  }).join("");
+
+  const labels=[0,Math.floor((p.length-1)/2),p.length-1].map(function(i){
+    return '<text x="'+p[i].x+'" y="'+(H-7)+'" text-anchor="middle">'+
+      new Intl.DateTimeFormat("es-ES",{month:"short"}).format(
+        new Date(snapshots[i].month+"-01T12:00:00")
+      ).replace(".","")+
+      '</text>';
+  }).join("");
+
+  return '<svg class="line-chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Evolucion del patrimonio">'+
+    '<defs><linearGradient id="wealth-area" x1="0" x2="0" y1="0" y2="1">'+
+    '<stop stop-color="#f32d3a" stop-opacity=".32"/>'+
+    '<stop offset="1" stop-color="#f32d3a" stop-opacity="0"/>'+
+    '</linearGradient></defs>'+
+    grid+
+    '<path class="area" d="'+area+'"/>'+
+    '<path class="line" d="'+line+'"/>'+
+    '<circle class="dot" cx="'+p[p.length-1].x+'" cy="'+p[p.length-1].y+'" r="4.8"/>'+
+    labels+
+    '</svg>';
 }
 function miniChart(){
-  const values=state.snapshots.slice(-8).map(function(s){return s.value;}), max=Math.max.apply(null,values),min=Math.min.apply(null,values);
-  const p=values.map(function(v,i){return {x:i*100/(values.length-1),y:56-(v-min)/(max-min)*45};}), line=p.map(function(a,i){return (i?"L":"M")+a.x+","+a.y;}).join("");
-  return '<svg class="wealth-mini-chart" viewBox="0 0 100 65" preserveAspectRatio="none"><defs><linearGradient id="mini-chart-fill" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#f32d3a" stop-opacity=".32"/><stop offset="1" stop-color="#f32d3a" stop-opacity="0"/></linearGradient></defs><path class="chart-area" d="'+line+' L100,64 L0,64 Z"/><path class="chart-line" d="'+line+'"/></svg>';
+  const snapshots = Array.isArray(state.snapshots) ? state.snapshots : [];
+  const values = snapshots.slice(-8).map(function(s){
+    return Number(s.value) || 0;
+  });
+
+  if (values.length < 2) {
+    return '<div class="wealth-mini-chart chart-empty-mini"></div>';
+  }
+
+  const max = Math.max.apply(null,values);
+  const min = Math.min.apply(null,values);
+  const range = Math.max(max-min,1);
+
+  const p=values.map(function(v,i){
+    return {
+      x:i*100/(values.length-1),
+      y:56-(v-min)/range*45
+    };
+  });
+
+  const line=p.map(function(a,i){
+    return (i?"L":"M")+a.x+","+a.y;
+  }).join("");
+
+  return '<svg class="wealth-mini-chart" viewBox="0 0 100 65" preserveAspectRatio="none">'+
+    '<defs><linearGradient id="mini-chart-fill" x1="0" x2="0" y1="0" y2="1">'+
+    '<stop stop-color="#f32d3a" stop-opacity=".32"/>'+
+    '<stop offset="1" stop-color="#f32d3a" stop-opacity="0"/>'+
+    '</linearGradient></defs>'+
+    '<path class="chart-area" d="'+line+' L100,64 L0,64 Z"/>'+
+    '<path class="chart-line" d="'+line+'"/>'+
+    '</svg>';
 }
 function table(list,actions){
   if(!list.length) return '<div class="table-empty"><span data-icon="receipt"></span><p>No hay movimientos con este filtro.</p></div>';
@@ -227,7 +306,7 @@ function insight(m,h){
   return '<article class="insight-card"><div class="section-kicker">Lectura de este mes</div><h3>'+ (m.savings>=0?"Estas generando ahorro":"Hay que proteger el flujo mensual") +'</h3><p>'+ (top?"La mayor partida es "+top.name+" con "+money(top.value)+".":"Anade movimientos para encontrar patrones.") +'</p><ul class="insight-list"><li><i class="status-dot '+(h.liquid>=h.target?"":"warn")+'"></i>Liquidez: '+money(h.liquid)+'</li><li><i class="status-dot"></i>Salud financiera: '+h.score+"/100</li></ul></article><article class=\"insight-card\"><div class=\"section-kicker\">Alertas relevantes</div><h3>"+alerts[0].title+'</h3><ul class="insight-list">'+alerts.map(function(a){return '<li><i class="status-dot '+(a.level==="good"?"":a.level)+'"></i>'+a.text+'</li>';}).join("")+'</ul><button class="text-button" data-action="alerts">Ver analisis</button></article>';
 }
 function dashboard(){
-  const m=metrics(nowMonth()), old=metrics(previousMonth()), h=health(), r=recommendation(), w=wealth(), prior=state.snapshots[state.snapshots.length-2].value, change=w-prior, allocation=allocations(), total=allocation.reduce(function(s,a){return s+a.value;},0);
+  const m=metrics(nowMonth()), old=metrics(previousMonth()), h=health(), r=recommendation(), w=wealth(), snapshots=Array.isArray(state.snapshots)?state.snapshots:[], prior=snapshots.length>1?(Number(snapshots[snapshots.length-2].value)||0):w, change=w-prior, allocation=allocations(), total=allocation.reduce(function(s,a){return s+a.value;},0);
   let acc=0, vars=allocation.map(function(a,i){acc+=a.value;return "--c"+(i+1)+":"+a.color+";--p"+(i+1)+":"+(acc/total*100).toFixed(2)+"%;";}).join("");
   const rows=allocation.map(function(a){return '<div class="allocation-row"><i style="--color:'+a.color+'"></i><span>'+a.name+'</span><strong>'+money(a.value)+' <span class="panel-note">'+percent(a.value/total)+'</span></strong></div>';}).join("");
   const quick=[["Donde invierto este mes?","inversion","trend"],["Como va mi patrimonio?","patrimonio","chart"],["Que gastos puedo recortar?","gastos","receipt"],["Riesgos detectados","riesgos","alert"]].map(function(q){return '<button class="quick-chip" data-action="ask" data-q="'+q[1]+'"><span data-icon="'+q[2]+'"></span>'+q[0]+'</button>';}).join("");
