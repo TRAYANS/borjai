@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090a0d">
   <meta name="description" content="BorjaAI, asistente financiero personal con analisis contextual.">
   <title>BorjaAI | Tu asistente financiero</title>
-  <link rel="stylesheet" href="styles.css?v=1.2.1">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="app-shell">
@@ -15,6 +15,7 @@
         <span class="wordmark-mark">B</span>
         <span>Borja<span>AI</span></span>
       </a>
+
       <nav class="side-nav">
         <button type="button" class="nav-link is-active" data-view="inicio" data-nav="inicio"><span data-icon="home"></span>Inicio</button>
         <button type="button" class="nav-link" data-view="movimientos"><span data-icon="arrows"></span>Movimientos</button>
@@ -24,11 +25,13 @@
         <button type="button" class="nav-link" data-view="objetivos"><span data-icon="target"></span>Objetivos</button>
         <button type="button" class="nav-link" data-view="coach"><span data-icon="sparkles"></span>Coach IA</button>
       </nav>
+
       <div class="sidebar-bottom">
         <button type="button" class="import-button" data-action="open-import"><span data-icon="upload"></span><span>Anadir informacion</span></button>
         <button type="button" class="nav-link settings-link" data-action="open-settings"><span data-icon="settings"></span>Configuracion</button>
       </div>
     </aside>
+
     <div class="app-frame">
       <header class="topbar">
         <button type="button" class="icon-button mobile-menu" data-action="toggle-menu" aria-label="Abrir navegacion"><span data-icon="menu"></span></button>
@@ -39,10 +42,14 @@
           <button type="button" class="profile-button" data-action="open-settings" aria-label="Abrir configuracion">B</button>
         </div>
       </header>
+
       <main id="app-view" tabindex="-1"></main>
-      <footer class="app-footer" aria-label="Version de la aplicacion"><span id="app-version"></span></footer>
+      <footer class="app-footer" aria-label="Version de la aplicacion">
+        <span id="app-version"></span>
+      </footer>
     </div>
   </div>
+
   <nav class="mobile-nav" aria-label="Navegacion movil">
     <button type="button" class="mobile-nav-item is-active" data-view="inicio"><span data-icon="home"></span><span>Inicio</span></button>
     <button type="button" class="mobile-nav-item" data-view="movimientos"><span data-icon="arrows"></span><span>Movimientos</span></button>
@@ -50,9 +57,10 @@
     <button type="button" class="mobile-nav-item" data-view="inversiones"><span data-icon="chart"></span><span>Inversiones</span></button>
     <button type="button" class="mobile-nav-item" data-view="coach"><span data-icon="sparkles"></span><span>Coach IA</span></button>
   </nav>
+
   <div id="modal-root"></div>
   <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
-  <script src="supabase-config.js?v=1.2.1"></script>
-  <script type="module" src="app.js?v=1.2.1"></script>
+  <script src="supabase-config.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
