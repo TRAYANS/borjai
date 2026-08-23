@@ -98,7 +98,16 @@ export function createSupabaseRepository(client, fallbackFactory) {
         rows[table] = await selectAll(client, table);
       }
 
-      return fromDatabaseRows(rows, fallbackFactory);
+      const loaded = fromDatabaseRows(rows, fallbackFactory);
+
+      // Si Supabase todavía no tiene cuentas, conservamos las cuentas
+      // iniciales para que los selectores de origen/destino sigan funcionando.
+      if (!Array.isArray(loaded.accounts) || loaded.accounts.length === 0) {
+        const fallback = fallbackFactory();
+        loaded.accounts = Array.isArray(fallback.accounts) ? fallback.accounts : [];
+      }
+
+      return loaded;
     },
 
     async saveState(state) {
