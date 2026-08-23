@@ -1,5 +1,9 @@
+import { createLocalStorageRepository } from "./src/storage.js";
+import { CATEGORIES, parseCsv as parseCsvText, parseNumber } from "./src/importer.js";
+import * as finance from "./src/finance.js";
+import { buildLocalCoachAnswer } from "./src/coach.js";
+
 const KEY = "borjai:mvp:v1";
-const CATEGORIES = ["Vivienda","Alimentacion","Gasolina","Transporte","Ocio","Restaurantes","Compras","Suscripciones","Viajes","Salud","Seguros","Formacion","Tecnologia","Otros"];
 const ICONS = {
   home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   arrows:'<path d="M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3"/>',
@@ -27,6 +31,7 @@ let currentView = "inicio";
 let stagedImport = null;
 let chat = [];
 let filter = { search:"", type:"all" };
+let repository = createLocalStorageRepository(KEY, seed);
 let state = load();
 
 function icon(name) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.info) + '</svg>'; }
@@ -94,54 +99,20 @@ function seed() {
     imports:[], snapshots:snapshots
   };
 }
-function load(){ try { const item=JSON.parse(localStorage.getItem(KEY)); if(item && item.version===1) return item; } catch(e){} return seed(); }
-function save(){ localStorage.setItem(KEY,JSON.stringify(state)); }
+function load(){ return repository.load(); }
+function save(){ repository.save(state); }
 
-function account(id){ return state.accounts.find(function(a){return a.id===id;}) || state.accounts[0]; }
+function account(id){ return finance.account(state,id); }
 function accountName(id){ return account(id) ? account(id).name : "Sin cuenta"; }
-function group(name){ return state.assets.filter(function(a){return a.group===name;}).reduce(function(sum,a){return sum+a.value;},0); }
-function liquid(){ return state.accounts.reduce(function(sum,a){return sum+a.balance;},0); }
-function debt(){ return state.debts.reduce(function(sum,a){return sum+a.balance;},0); }
-function wealth(){ return liquid()+state.assets.reduce(function(sum,a){return sum+a.value;},0)-debt(); }
-function monthItems(key){ return state.transactions.filter(function(t){return t.date.slice(0,7)===key;}); }
-function metrics(key){
-  const list=monthItems(key);
-  const income=list.filter(function(t){return t.type==="income" || t.type==="dividend";}).reduce(function(sum,t){return sum+t.amount;},0);
-  const expense=list.filter(function(t){return t.type==="expense" || t.type==="fee";}).reduce(function(sum,t){return sum+Math.abs(t.amount);},0);
-  const invested=list.filter(function(t){return t.type==="investment_buy";}).reduce(function(sum,t){return sum+Math.abs(t.amount);},0);
-  return {income:income,expense:expense,invested:invested,savings:income-expense,rate:income?(income-expense)/income:0};
-}
-function allocations(){
-  const bank=state.accounts.filter(function(a){return a.kind==="bank";}).reduce(function(s,a){return s+a.balance;},0);
-  const cash=state.accounts.filter(function(a){return a.kind==="cash";}).reduce(function(s,a){return s+a.balance;},0);
-  return [
-    {name:"Bancos",value:bank,color:"#f32d3a"},{name:"Inversiones",value:group("Inversiones"),color:"#c51c2a"},
-    {name:"Criptomonedas",value:group("Criptomonedas"),color:"#812431"},{name:"Oro y Metales",value:group("Oro y Metales"),color:"#c76b50"},
-    {name:"Efectivo",value:cash,color:"#636a75"},{name:"Otros Activos",value:group("Otros Activos"),color:"#989da5"}
-  ].filter(function(a){return a.value>0;});
-}
-function health(){
-  const m=metrics(nowMonth()), w=wealth(), l=liquid(), target=Math.max(m.expense*state.profile.emergency,w*.1), allocation=allocations();
-  const max=allocation.reduce(function(n,a){return Math.max(n,a.value/w);},0), invested=group("Inversiones")+group("Criptomonedas")+group("Oro y Metales");
-  const progress=state.goals.length?state.goals.reduce(function(s,g){return s+Math.min(g.current/g.target,1);},0)/state.goals.length:0;
-  const parts=[
-    {label:"Ahorro",score:Math.max(0,Math.min(100,m.rate/.2*100)),note:m.rate>=.15?"Ritmo saludable":"Conviene elevar la tasa"},
-    {label:"Liquidez",score:Math.max(0,Math.min(100,l/target*100)),note:money(l)+" frente a "+money(target)+" de reserva"},
-    {label:"Inversion",score:Math.min(100,invested/w/.65*100),note:percent(invested/w)+" del patrimonio invertido"},
-    {label:"Diversificacion",score:Math.max(25,Math.min(100,120-max*100)),note:max>.45?"Hay concentracion relevante":"Reparto razonable entre grupos"},
-    {label:"Gastos",score:m.savings>0?Math.min(100,75+m.rate*70):25,note:m.savings>0?"El mes cierra con ahorro":"El gasto supera a los ingresos"},
-    {label:"Deuda",score:debt()?Math.max(15,100-debt()/w*150):100,note:debt()?"Hay deuda registrada":"No hay deudas registradas"},
-    {label:"Objetivos",score:progress*100,note:Math.round(progress*100)+"% de avance medio"}
-  ];
-  return {score:Math.round(parts.reduce(function(s,p){return s+p.score;},0)/parts.length),parts:parts,liquid:l,target:target,metrics:m};
-}
-function recommendation(){
-  const h=health(), m=h.metrics, extra=Math.max(0,h.liquid-h.target);
-  if(m.savings<=0) return {title:"Hoy priorizaria ajustar gasto",main:"No invertir hoy",detail:"Ahorro actual "+money(m.savings),text:"Los gastos han superado los ingresos. Antes de aumentar la cartera, protegeria el flujo mensual y revisaria las categorias discrecionales."};
-  if(h.liquid<h.target) return {title:"Hoy mantendria liquidez",main:"Mantener efectivo",detail:"Faltan "+money(h.target-h.liquid),text:"Tu reserva aun no cubre "+state.profile.emergency+" meses de gasto. Destinaria el ahorro a reforzarla antes de asumir mas riesgo."};
-  const amount=Math.min(state.profile.contribution,Math.max(100,Math.round(m.savings*.35/10)*10));
-  return {title:"Hoy mantendria una aportacion diversificada",main:"Aportar "+money(amount),detail:money(extra)+" por encima de reserva",text:"Tu liquidez cubre la reserva y el mes genera ahorro. Consideraria una aportacion gradual a la cartera sin mover el excedente de golpe."};
-}
+function group(name){ return finance.group(state,name); }
+function liquid(){ return finance.liquid(state); }
+function debt(){ return finance.debt(state); }
+function wealth(){ return finance.wealth(state); }
+function monthItems(key){ return finance.monthItems(state,key); }
+function metrics(key){ return finance.metrics(state,key); }
+function allocations(){ return finance.allocations(state); }
+function health(){ return finance.health(state,nowMonth(),{money:money,percent:percent}); }
+function recommendation(){ return finance.recommendation(state,nowMonth(),{money:money,percent:percent}); }
 function expenseCategories(){
   const map={}; monthItems(nowMonth()).filter(function(t){return t.type==="expense" || t.type==="fee";}).forEach(function(t){map[t.category]=(map[t.category]||0)+Math.abs(t.amount);});
   return Object.keys(map).map(function(k){return {name:k,value:map[k]};}).sort(function(a,b){return b.value-a.value;});
@@ -162,6 +133,7 @@ function badge(t){const cls=t==="income"||t==="dividend"?"badge-income":t==="exp
 function head(kicker,title,copy,actions){return '<header class="view-head"><div><div class="section-kicker">'+kicker+'</div><h1>'+title+'</h1>'+(copy?'<p>'+copy+'</p>':"")+'</div>'+(actions?'<div class="view-head-actions">'+actions+'</div>':"")+'</header>';}
 function ring(score){return '<div class="health-ring" style="--score:'+score+'"><div class="health-ring-content"><small>Salud<br>financiera</small><strong>'+score+'</strong><span>/100</span></div></div>';}
 function metric(label,value,note,ico,tone){return '<article class="metric-panel"><div class="metric-panel-top"><span class="metric-label">'+label+'</span><span data-icon="'+ico+'"></span></div><strong class="metric-panel-value">'+value+'</strong><div class="metric-panel-note '+(tone||"")+'">'+note+'</div></article>';}
+function coachVisual(className){return '<div class="'+className+'" aria-hidden="true"><span>B</span><i>AI</i></div>';}
 function chart(){
   const values=state.snapshots.map(function(s){return s.value;}), max=Math.max.apply(null,values)*1.04, min=Math.min.apply(null,values)*.96, W=700,H=230,L=35,R=10,T=15,B=33;
   const p=values.map(function(v,i){return {x:L+(W-L-R)*i/(values.length-1),y:T+(H-T-B)*(1-(v-min)/(max-min))};});
@@ -195,7 +167,7 @@ function dashboard(){
     '<div class="dashboard-two"><section class="chart-panel"><div class="panel-head"><div><h2 class="panel-title">Evolucion del patrimonio</h2><span class="panel-note">Ultimos 12 meses</span></div><select class="period-select"><option>12 meses</option></select></div>'+chart()+'</section><section class="recommendation-panel"><div class="recommendation-top"><div class="recommendation-icon"><span data-icon="sparkles"></span></div><div><div class="section-kicker">Que haria hoy</div><h2>'+r.title+'</h2></div></div><p>'+r.text+'</p><div class="recommendation-facts"><div class="fact"><span>Propuesta</span><strong>'+r.main+'</strong></div><div class="fact"><span>Margen liquido</span><strong>'+r.detail+'</strong></div></div><div class="disclaimer">Analisis con tus datos locales. No incluye cotizaciones ni noticias en tiempo real.</div></section></div>'+
     '<section class="distribution-panel"><div class="panel-head"><div><h2 class="panel-title">Distribucion del patrimonio</h2><span class="panel-note">Activos menos deudas</span></div><button class="text-button" data-view="patrimonio">Ver patrimonio</button></div><div class="distribution-content"><div class="donut-wrap"><div class="donut" style="'+vars+'"></div><div class="donut-total"><strong>'+money(w)+'</strong><span>Total</span></div></div><div class="allocation-list">'+rows+'</div></div></section>'+
     '<div class="metric-grid">'+metric("Ingresos",money(m.income),"Este mes","upload","positive")+metric("Gastos",money(m.expense),(m.expense-old.expense>=0?"+":"")+percent((m.expense-old.expense)/(old.expense||1))+" frente al mes anterior","receipt",m.expense>old.expense?"negative":"")+metric("Ahorro",money(m.savings),percent(m.rate)+" de tus ingresos","wallet",m.savings>=0?"positive":"negative")+metric("Inversion",money(m.invested),"No se contabiliza como gasto","chart","")+'</div>'+
-    '<section class="panel coach-strip"><div class="coach-strip-copy"><div class="section-kicker">Coach Financiero <span class="badge badge-investment">IA local</span></div><h2>Un resumen que te ayuda a decidir</h2><p>'+r.main+". "+r.text+'</p><div class="coach-actions">'+quick+'</div></div><img class="coach-art" src="assets/borjai-coach-640.png" alt=""></section>'+
+    '<section class="panel coach-strip"><div class="coach-strip-copy"><div class="section-kicker">Coach Financiero <span class="badge badge-investment">IA local</span></div><h2>Un resumen que te ayuda a decidir</h2><p>'+r.main+". "+r.text+'</p><div class="coach-actions">'+quick+'</div></div>'+coachVisual("coach-art coach-fallback")+'</section>'+
     '<div class="content-grid"><section class="table-shell"><div class="table-toolbar"><div><h2 class="panel-title">Ultimos movimientos</h2><span class="panel-note">Tu fuente de verdad financiera</span></div><button class="btn btn-small" data-view="movimientos">Ver todos</button></div>'+table(state.transactions.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,5),false)+'</section><aside class="side-stack">'+insight(m,h)+'</aside></div></div></section>';
 }
 function movements(){
@@ -254,20 +226,22 @@ function coachContext(){
   };
 }
 function answer(q){
-  const n=clean(q),m=metrics(nowMonth()),h=health(),top=expenseCategories()[0],r=recommendation();
-  if(n.includes("inviert")||n.includes("cartera")||n.includes("donde")) return r.main+". "+r.text+" Tu cartera invertida es "+money(group("Inversiones")+group("Criptomonedas")+group("Oro y Metales"))+".";
-  if(n.includes("gast")||n.includes("recort")) return top?"Este mes has gastado "+money(m.expense)+". La partida con mas impacto es "+top.name+" ("+money(top.value)+"). Un recorte del 10% liberaria "+money(top.value*.1)+". Tus "+money(m.invested)+" de aportaciones no son gasto.":"Aun no hay suficientes gastos para detectar un patron.";
-  if(n.includes("patrimonio")||n.includes("como voy")) return "Tu patrimonio actual es "+money(wealth())+". El ahorro del mes es "+money(m.savings)+" y la salud financiera es "+h.score+"/100.";
-  if(n.includes("liquidez")||n.includes("efectivo")) return "Tienes "+money(h.liquid)+" en cuentas y efectivo. Con gasto mensual de "+money(m.expense)+", el objetivo de reserva es "+money(h.target)+".";
-  if(n.includes("objetiv")) {const g=state.goals.slice().sort(function(a,b){return b.current/b.target-a.current/a.target;})[0];return g?"Tu objetivo mas avanzado es "+g.name+": "+Math.round(g.current/g.target*100)+"%. Faltan "+money(g.target-g.current)+".":"Crea un objetivo para calcular el ritmo necesario.";}
-  if(n.includes("riesgo")||n.includes("alert")) return alertList().filter(function(a){return a.level!=="good";}).map(function(a){return a.title+": "+a.text;}).join(" ") || "No detecto alertas relevantes.";
-  return "Tu patrimonio es "+money(wealth())+", ahorras "+money(m.savings)+" este mes y tu salud financiera es "+h.score+"/100. Preguntame por gasto, liquidez, cartera, objetivos o patrimonio.";
+  return buildLocalCoachAnswer(q,{
+    metrics:metrics(nowMonth()),
+    health:health(),
+    topExpense:expenseCategories()[0],
+    recommendation:recommendation(),
+    invested:group("Inversiones")+group("Criptomonedas")+group("Oro y Metales"),
+    wealth:wealth(),
+    goals:state.goals,
+    alerts:alertList()
+  },{money:money});
 }
 function coach(){
   const h=health(),r=recommendation(), messages=chat.length?chat:[{role:"assistant",text:"Hola, Borja. He revisado tus registros: patrimonio de "+money(wealth())+", ahorro de "+money(h.metrics.savings)+" y salud "+h.score+"/100. ¿Que quieres analizar?"}];
-  const rendered=messages.map(function(m){return '<div class="chat-message '+(m.role==="user"?"user":"")+'">'+(m.role==="assistant"?'<div class="chat-avatar"><img src="assets/borjai-coach-640.png" alt=""></div>':"")+'<div class="chat-bubble">'+safe(m.text)+'</div></div>';}).join("");
+  const rendered=messages.map(function(m){return '<div class="chat-message '+(m.role==="user"?"user":"")+'">'+(m.role==="assistant"?coachVisual("chat-avatar coach-avatar-fallback"):"")+'<div class="chat-bubble">'+safe(m.text)+'</div></div>';}).join("");
   const quick=["Donde invierto este mes?","Que gastos puedo recortar?","Como va mi patrimonio?","Estoy diversificado?"].map(function(q){return '<button class="quick-chip" data-action="ask" data-q="'+q+'">'+q+'</button>';}).join("");
-  return '<section class="view">'+head("Analisis conversacional","Coach Financiero","Respuestas basadas en tus registros. No sustituye asesoramiento financiero profesional.")+'<div class="coach-view"><section class="chat-panel panel"><div class="chat-messages" id="messages">'+rendered+'</div><div class="chat-suggestions">'+quick+'</div><form class="chat-input-row" id="chat-form"><input name="question" placeholder="Pregunta por tu dinero..." autocomplete="off"><button class="btn btn-primary chat-send" aria-label="Enviar"><span data-icon="send"></span></button></form></section><aside class="coach-context panel"><div class="coach-avatar-large"><img src="assets/borjai-coach-640.png" alt=""></div><h2>Contexto actual</h2><p>El Coach lee tus datos estructurados; no inventa movimientos.</p><div class="context-fact"><span>Patrimonio</span><strong>'+money(wealth())+'</strong></div><div class="context-fact"><span>Ahorro del mes</span><strong>'+money(h.metrics.savings)+'</strong></div><div class="context-fact"><span>Reserva objetivo</span><strong>'+money(h.target)+'</strong></div><div class="context-fact"><span>Que haria hoy</span><strong>'+r.main+'</strong></div></aside></div></section>';
+  return '<section class="view">'+head("Analisis conversacional","Coach Financiero","Respuestas basadas en tus registros. No sustituye asesoramiento financiero profesional.")+'<div class="coach-view"><section class="chat-panel panel"><div class="chat-messages" id="messages">'+rendered+'</div><div class="chat-suggestions">'+quick+'</div><form class="chat-input-row" id="chat-form"><input name="question" placeholder="Pregunta por tu dinero..." autocomplete="off"><button class="btn btn-primary chat-send" aria-label="Enviar"><span data-icon="send"></span></button></form></section><aside class="coach-context panel">'+coachVisual("coach-avatar-large coach-fallback-large")+'<h2>Contexto actual</h2><p>El Coach lee tus datos estructurados; no inventa movimientos.</p><div class="context-fact"><span>Patrimonio</span><strong>'+money(wealth())+'</strong></div><div class="context-fact"><span>Ahorro del mes</span><strong>'+money(h.metrics.savings)+'</strong></div><div class="context-fact"><span>Reserva objetivo</span><strong>'+money(h.target)+'</strong></div><div class="context-fact"><span>Que haria hoy</span><strong>'+r.main+'</strong></div></aside></div></section>';
 }
 function imports(){
   const history=state.imports.length?state.imports.slice().reverse().map(function(i){return '<div class="history-row"><div><strong>'+safe(i.fileName)+'</strong><span>'+date(i.createdAt)+" · "+i.count+" movimientos confirmados</span></div><button class=\"btn btn-small btn-danger\" data-action=\"undo\" data-id=\""+i.id+"\">Deshacer</button></div>";}).join(""):'<div class="empty-state"><span data-icon="upload"></span><p>Aun no has confirmado ninguna importacion.</p></div>';
@@ -304,17 +278,7 @@ function settings(){
   modal('<header class="modal-head"><div><div class="section-kicker">Configuracion</div><h2>Preferencias financieras</h2><p>Estas reglas alimentan la lectura local del Coach.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="settings-form"><div class="modal-body"><div class="form-grid"><div class="form-field"><label>Tu nombre</label><input name="name" required value="'+safe(state.profile.name)+'"></div><div class="form-field"><label>Perfil de riesgo</label><select name="risk"><option'+(state.profile.risk==="Conservador"?" selected":"")+'>Conservador</option><option'+(state.profile.risk==="Moderado"?" selected":"")+'>Moderado</option><option'+(state.profile.risk==="Dinamico"?" selected":"")+'>Dinamico</option></select></div><div class="form-field"><label>Meses de emergencia</label><input name="emergency" type="number" min="1" max="12" required value="'+state.profile.emergency+'"></div><div class="form-field"><label>Aportacion mensual</label><input name="contribution" type="number" min="0" step="10" required value="'+state.profile.contribution+'"></div></div><button class="btn btn-small btn-danger" style="margin-top:20px" type="button" data-action="reset"><span data-icon="refresh"></span>Restablecer datos de ejemplo</button></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar cambios</button></footer></form>');
 }
 function alertsModal(){const list=alertList();modal('<header class="modal-head"><div><div class="section-kicker">Alertas inteligentes</div><h2>Solo lo que requiere atencion</h2><p>Cada aviso esta vinculado a tus datos.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><div class="modal-body"><div class="insight-list">'+list.map(function(a){return '<div class="health-row"><i class="status-dot '+(a.level==="good"?"":a.level)+'"></i><span>'+a.title+'</span><strong>'+ (a.level==="good"?"Estable":"Revisar") +'</strong><small>'+a.text+'</small></div>';}).join("")+'</div></div><footer class="modal-foot"><button class="btn btn-primary" data-action="close-modal">Entendido</button></footer>');}
-function classify(text){const n=clean(text),rules=[["mercadona|carrefour|lidl|alcampo","Alimentacion"],["repsol|cepsa|shell","Gasolina"],["uber|cabify|renfe|metro","Transporte"],["netflix|spotify|icloud|adobe|youtube|hbo|disney","Suscripciones"],["alquiler|hipoteca|comunidad","Vivienda"],["zara|amazon|ikea|decathlon","Compras"],["restaurante|glovo|just eat|bar |cafe","Restaurantes"],["mapfre|mutua|adeslas|sanitas","Seguros"],["farmacia|dent|medic","Salud"]];const rule=rules.find(function(r){return new RegExp(r[0]).test(n);});return rule?rule[1]:"Otros";}
-function parseNumber(v){const s=String(v||"").replace(/[€\s]/g,""),x=s.includes(",")&&s.includes(".")?s.replace(/\./g,"").replace(",","."):s.replace(",",".");return Number(x);}
-function csvLine(line,delim){let out=[],v="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){v+='"';i++;}else q=!q;}else if(c===delim&&!q){out.push(v.trim());v="";}else v+=c;}out.push(v.trim());return out;}
-function csvDate(v){const x=String(v||"").trim();if(/^\d{4}-\d{2}-\d{2}$/.test(x))return x;const m=x.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);return m?(m[3].length===2?"20"+m[3]:m[3])+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0"):iso(new Date());}
-function parseCsv(text,file){
-  const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(function(l){return l.trim();});if(lines.length<2)throw new Error("El CSV necesita encabezados y al menos un movimiento.");
-  const delim=lines[0].split(";").length>lines[0].split(",").length?";":",",headers=csvLine(lines[0],delim).map(clean);
-  const find=function(options){return headers.findIndex(function(h){return options.some(function(o){return h.includes(o);});});}, d=find(["fecha","date","dia"]),m=find(["concepto","descripcion","detalle","merchant","nombre"]),a=find(["importe","amount","cantidad","valor","monto"]),c=find(["categoria","category"]);
-  if(a<0||m<0)throw new Error("No encuentro columnas de concepto e importe. Usa fecha, concepto, importe y categoria.");
-  return lines.slice(1).map(function(line){const v=csvLine(line,delim),amount=parseNumber(v[a]),merchant=v[m]||"Movimiento importado";if(!Number.isFinite(amount))return null;const category=c>=0&&v[c]?v[c]:classify(merchant);return {date:d>=0?csvDate(v[d]):iso(new Date()),merchant:merchant,description:"Importado desde "+file,amount:amount,type:amount>=0?"income":"expense",category:CATEGORIES.includes(category)?category:classify(merchant),accountId:state.accounts[0].id};}).filter(Boolean).slice(0,500);
-}
+function parseCsv(text,file){ return parseCsvText(text,file,state.accounts[0].id); }
 async function upload(files){
   const list=Array.from(files||[]),csvs=list.filter(function(f){return f.name.toLowerCase().endsWith(".csv")||f.type==="text/csv";}),other=list.filter(function(f){return !csvs.includes(f);});
   if(csvs.length){try{let candidates=[];for(const f of csvs)candidates=candidates.concat(parseCsv(await f.text(),f.name));if(!candidates.length)throw new Error("No he encontrado importes validos.");stagedImport={id:uid("import"),fileName:csvs.map(function(f){return f.name;}).join(", "),createdAt:iso(new Date()),candidates:candidates};review();return;}catch(e){toast(e.message||"No se pudo analizar el CSV.",true);}}
@@ -352,11 +316,13 @@ document.addEventListener("click",function(e){
   else if(action==="goal")goalModal(b.dataset.id);
   else if(action==="account")accountModal();
   else if(action==="open-settings")settings();
+  else if(action==="open-import")go("importar");
+  else if(action==="show-alerts")alertsModal();
   else if(action==="alerts")alertsModal();
   else if(action==="ask")ask(b.dataset.q);
   else if(action==="delete"){const t=state.transactions.find(function(x){return x.id===b.dataset.id;});if(t&&confirm("¿Eliminar este movimiento?")){effect(t,-1);state.transactions=state.transactions.filter(function(x){return x!==t;});snapshot();save();render();toast("Movimiento eliminado.");}}
   else if(action==="undo")undo(b.dataset.id);
-  else if(action==="reset"){if(confirm("¿Restablecer todos los datos locales de ejemplo?")){state=seed();chat=[];save();close();render();toast("Datos de ejemplo restablecidos.");}}
+  else if(action==="reset"){if(confirm("¿Restablecer todos los datos locales de ejemplo?")){state=repository.reset();chat=[];close();render();toast("Datos de ejemplo restablecidos.");}}
 });
 document.addEventListener("change",function(e){
   if(e.target.id==="file-input"){upload(e.target.files);e.target.value="";}

@@ -300,6 +300,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .quick-chip:hover { border-color: rgba(243,45,58,.55); color: #fff; background: var(--red-soft); }
 .quick-chip [data-icon] { width: 16px; height: 16px; color: var(--red); }
 .coach-art { width: 100%; height: 100%; min-height: 210px; object-fit: contain; object-position: bottom right; filter: drop-shadow(0 14px 22px rgba(243,45,58,.15)); }
+.coach-fallback {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(243,45,58,.34), transparent 34%),
+    linear-gradient(160deg, rgba(255,255,255,.07), rgba(243,45,58,.08));
+  color: white;
+}
+.coach-fallback::before {
+  content: "";
+  position: absolute;
+  inset: 22px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 50%;
+}
+.coach-fallback span { position: relative; font-size: 76px; font-weight: 850; line-height: .9; }
+.coach-fallback i { position: relative; color: var(--red); font-size: 20px; font-style: normal; font-weight: 850; letter-spacing: .04em; }
 
 .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; }
 .content-stack { display: grid; gap: 18px; }
@@ -404,6 +424,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .chat-message { display: grid; grid-template-columns: 31px minmax(0, 1fr); gap: 9px; max-width: 88%; }
 .chat-avatar { display: grid; width: 31px; height: 31px; place-items: center; overflow: hidden; border-radius: 9px; background: var(--red-soft); color: var(--red); font-size: 12px; font-weight: 800; }
 .chat-avatar img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.coach-avatar-fallback span { font-size: 13px; line-height: 1; }
+.coach-avatar-fallback i { display: none; }
 .chat-bubble { padding: 11px 13px; border: 1px solid var(--line-soft); border-radius: 4px 11px 11px; background: rgba(255,255,255,.035); color: #d9dce0; font-size: 13px; line-height: 1.55; }
 .chat-message.user { grid-template-columns: minmax(0, 1fr); justify-self: end; }
 .chat-message.user .chat-bubble { border-radius: 11px 4px 11px 11px; background: var(--red-soft); color: #fff; }
@@ -414,6 +436,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .coach-context { padding: 20px; }
 .coach-avatar-large { display: grid; height: 152px; place-items: center; overflow: hidden; margin: -4px 0 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: radial-gradient(circle at 50% 50%, rgba(243,45,58,.18), transparent 58%); }
 .coach-avatar-large img { width: 174px; height: 174px; object-fit: contain; object-position: bottom; }
+.coach-fallback-large span { font-size: 56px; }
+.coach-fallback-large i { font-size: 16px; }
 .coach-context h2 { margin: 0; font-size: 18px; }
 .coach-context > p { margin: 5px 0 17px; color: var(--muted); font-size: 12px; }
 .context-fact { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 12px; }
