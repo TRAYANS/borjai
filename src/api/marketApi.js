@@ -3,10 +3,8 @@ export function createMarketApi(supabaseClient) {
     if (!supabaseClient) throw new Error("Supabase no disponible.");
 
     const { data, error } = await supabaseClient.functions.invoke("market-data", {
-      method: "GET",
-      body: undefined,
-      headers: { "Content-Type": "application/json" },
-      queryParams: ids.length ? { ids: ids.join(",") } : undefined
+      body: { ids },
+      headers: { "Content-Type": "application/json" }
     });
 
     if (error) throw error;
