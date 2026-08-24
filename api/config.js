@@ -5,10 +5,15 @@ export default async function handler(req, res) {
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+  const groqConfigured = Boolean(process.env.GROQ_API_KEY);
+  const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
+  res.setHeader("Cache-Control", "no-store, max-age=0");
   return res.status(200).json({
     supabaseUrl,
     supabaseAnonKey,
-    backendMode: "auto"
+    backendMode: supabaseConfigured ? "supabase" : "local",
+    supabaseConfigured,
+    groqConfigured
   });
 }
