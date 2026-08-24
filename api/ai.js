@@ -46,18 +46,11 @@ Reglas:
 - confidence debe estar entre 0 y 1.
 - Si aparecen varios datos pero no puedes determinar una unica operacion, usa type=unknown y conserva solo los campos inequívocos.`;
 
-    // Groq puede cambiar la disponibilidad de modelos por cuenta/fecha.
-    // No dejamos que una variable antigua rompa el importador de IA:
-    // para visión usamos un modelo actualmente soportado por Groq.
-    const configuredModel = process.env.GROQ_VISION_MODEL?.trim();
-    const supportedVisionModels = new Set([
-      "qwen/qwen3.6-27b",
-      "meta-llama/llama-4-scout-17b-16e-instruct",
-      "meta-llama/llama-4-maverick-17b-128e-instruct"
-    ]);
-    const visionModel = supportedVisionModels.has(configuredModel)
-      ? configuredModel
-      : "qwen/qwen3.6-27b";
+    // Para el importador de capturas usamos SIEMPRE el modelo multimodal
+    // actualmente documentado por Groq. No permitimos que una variable de
+    // entorno antigua seleccione Llama 4 Scout/Maverick y rompa la petición.
+    // Qwen 3.6 27B admite imágenes y JSON mode.
+    const visionModel = "qwen/qwen3.6-27b";
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
