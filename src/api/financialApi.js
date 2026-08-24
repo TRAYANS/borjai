@@ -29,7 +29,40 @@ export async function createFinancialApi(options) {
 
   async function load() {
     try {
-      return await activeRepository.load();
+      const remote = await activeRepository.load();
+
+      if (activeRepository.kind === "supabase") {
+        const localState = localRepository.readRaw();
+        const validation = validateLegacyState(localState);
+        if (validation.ok) {
+          const localNormalized = normalizeState(localState, fallbackFactory);
+          const remoteCounts = stateCounts(remote);
+          const localCounts = stateCounts(localNormalized);
+          const localHasNewerData =
+            localCounts.transactions > remoteCounts.transactions ||
+            localCounts.accounts > remoteCounts.accounts ||
+            localCounts.assets > remoteCounts.assets ||
+            localCounts.goals > remoteCounts.goals ||
+            localCounts.imports > remoteCounts.imports ||
+            localCounts.wealthSnapshots > remoteCounts.wealthSnapshots;
+
+          if (localHasNewerData) {
+            localRepository.backup(LOCAL_BACKUP_KEY);
+            await activeRepository.migrateFromLocal(localNormalized);
+            const reconciled = await activeRepository.load();
+            localRepository.setMigrationStatus(MIGRATION_STATUS_KEY, {
+              ok: true,
+              reason: "reconciled_local_changes",
+              before: localCounts,
+              after: stateCounts(reconciled),
+              createdAt: new Date().toISOString()
+            });
+            return reconciled;
+          }
+        }
+      }
+
+      return remote;
     } catch (e) {
       backendStatus = { mode: "local", connected: false, error: e.message || "Backend no disponible. Usando datos locales." };
       activeRepository = localRepository;
@@ -40,13 +73,18 @@ export async function createFinancialApi(options) {
   async function saveState(state) {
     const normalized = normalizeState(state, fallbackFactory);
     await localRepository.saveState(normalized);
+
     if (activeRepository.kind === "supabase") {
       try {
-        return await activeRepository.saveState(normalized);
+        const saved = await activeRepository.saveState(normalized);
+        backendStatus = { mode: "supabase", connected: true, error: "" };
+        return saved;
       } catch (e) {
-        backendStatus = { mode: "local", connected: false, error: e.message || "No se pudo guardar en backend. Copia local conservada." };
+        backendStatus = { mode: "local", connected: false, error: e.message || "No se pudo guardar en Supabase. Se conserva una copia local." };
+        throw e;
       }
     }
+
     return normalized;
   }
 
