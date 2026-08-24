@@ -1,9 +1,5 @@
 const modalId = "ai-import-modal";
 
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>\"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[c]));
-}
-
 function closeAiImport() {
   document.getElementById(modalId)?.remove();
 }
@@ -26,10 +22,12 @@ async function imageToJpegBase64(file) {
     });
 
     const maxSide = 2400;
-    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    const scale = Math.min(1, maxSide / Math.max(width, height));
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
-    canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
     const ctx = canvas.getContext("2d", { alpha: false });
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
@@ -39,7 +37,7 @@ async function imageToJpegBase64(file) {
   }
 }
 
-function openAiImport() {
+function openAiImport(initialFile = null) {
   closeAiImport();
   const root = document.createElement("div");
   root.id = modalId;
@@ -71,19 +69,30 @@ function openAiImport() {
   let extracted = null;
 
   root.querySelector("#ai-close").onclick = closeAiImport;
-  fileInput.onchange = () => {
-    const file = fileInput.files?.[0];
-    root.querySelector("#ai-file-label").textContent = file ? file.name : "Seleccionar captura";
-    analyze.disabled = !file;
+
+  function setFile(file) {
+    if (!file) return;
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+    } catch (_) {
+      // Safari may not allow assigning FileList; initialFile is still retained below.
+    }
+    root.querySelector("#ai-file-label").textContent = file.name;
+    analyze.disabled = false;
     register.style.display = "none";
     register.disabled = true;
     extracted = null;
     result.style.display = "none";
-    status.textContent = file ? "Archivo listo para analizar." : "";
-  };
+    status.textContent = "Archivo listo para analizar.";
+  }
+
+  fileInput.onchange = () => setFile(fileInput.files?.[0]);
+  if (initialFile) setFile(initialFile);
 
   analyze.onclick = async () => {
-    const file = fileInput.files?.[0];
+    const file = fileInput.files?.[0] || initialFile;
     if (!file) return;
     analyze.disabled = true;
     register.disabled = true;
@@ -117,11 +126,14 @@ function openAiImport() {
   register.onclick = () => {
     if (!extracted) return;
     window.dispatchEvent(new CustomEvent("borjai:ai-import", {
-      detail: { data: extracted, fileName: fileInput.files?.[0]?.name || "Importación IA" }
+      detail: { data: extracted, fileName: fileInput.files?.[0]?.name || initialFile?.name || "Importación IA" }
     }));
     closeAiImport();
   };
 }
+
+window.BorjaAI = window.BorjaAI || {};
+window.BorjaAI.openAiImportWithFile = openAiImport;
 
 document.addEventListener("click", event => {
   const trigger = event.target.closest('[data-action="open-ai-import"]');
