@@ -67,6 +67,15 @@ export function dedupeTransactions(transactions) {
   });
 }
 
+function snapshotDate(snapshot) {
+  if (snapshot && snapshot.date) return String(snapshot.date).slice(0, 10);
+  if (snapshot && snapshot.month) {
+    const raw = String(snapshot.month);
+    return raw.length === 7 ? raw + "-01" : raw.slice(0, 10);
+  }
+  return "";
+}
+
 export function toDatabaseRows(state, userId) {
   const categories = new Map();
   (state.transactions || []).forEach(function(t) {
@@ -180,15 +189,16 @@ export function toDatabaseRows(state, userId) {
       };
     }),
     wealth_snapshots: (state.snapshots || []).map(function(s) {
+      const date = snapshotDate(s);
       return {
         user_id: userId,
-        legacy_id: legacyId("snapshot", s.month),
-        snapshot_date: (s.month || "").length === 7 ? s.month + "-01" : s.date,
+        legacy_id: legacyId("snapshot", date),
+        snapshot_date: date || new Date().toISOString().slice(0, 10),
         assets_total: asNumber(s.value),
         liabilities_total: 0,
         net_worth: asNumber(s.value),
         liquid_total: null,
-        metadata: { month: s.month || null }
+        metadata: { month: (s.month || date.slice(0, 7) || null), source: s.source || "app" }
       };
     })
   };
@@ -196,18 +206,16 @@ export function toDatabaseRows(state, userId) {
 
 export function fromDatabaseRows(rows, fallbackFactory) {
   const fallback = fallbackFactory ? fallbackFactory() : { profile: {} };
-  const accounts = (rows.accounts || []).map(function(a) {
-    return { id: a.legacy_id || a.id, name: a.name, kind: a.type === "cash" ? "cash" : a.type === "broker" ? "broker" : "bank", balance: asNumber(a.current_balance) };
-  });
-  const assets = (rows.assets || []).map(function(a) {
-    const metadata = a.metadata || {};
-    return { id: a.legacy_id || a.id, name: a.name, ticker: a.ticker || "", group: metadata.group || "Otros Activos", type: metadata.legacyType || a.type, value: asNumber(a.current_value), cost: asNumber(a.cost_basis) };
-  });
   return {
     version: 1,
     profile: fallback.profile || {},
-    accounts: accounts,
-    assets: assets,
+    accounts: (rows.accounts || []).map(function(a) {
+      return { id: a.legacy_id || a.id, name: a.name, kind: a.type === "cash" ? "cash" : a.type === "broker" ? "broker" : "bank", balance: asNumber(a.current_balance) };
+    }),
+    assets: (rows.assets || []).map(function(a) {
+      const metadata = a.metadata || {};
+      return { id: a.legacy_id || a.id, name: a.name, ticker: a.ticker || "", group: metadata.group || "Otros Activos", type: metadata.legacyType || a.type, value: asNumber(a.current_value), cost: asNumber(a.cost_basis) };
+    }),
     debts: (rows.liabilities || []).map(function(d) {
       return { id: d.legacy_id || d.id, name: d.name, type: d.type, balance: asNumber(d.outstanding_balance), currency: d.currency || "EUR" };
     }),
@@ -222,7 +230,8 @@ export function fromDatabaseRows(rows, fallbackFactory) {
       return { id: i.legacy_id || i.id, fileName: i.file_name, createdAt: String(i.created_at || "").slice(0, 10), count: meta.count || 0, ids: meta.ids || [], status: i.status };
     }),
     snapshots: (rows.wealth_snapshots || []).map(function(s) {
-      return { month: s.metadata && s.metadata.month ? s.metadata.month : String(s.snapshot_date).slice(0, 7), value: asNumber(s.net_worth) };
-    })
+      const date = String(s.snapshot_date || "").slice(0, 10);
+      return { date: date, month: (s.metadata && s.metadata.month) ? s.metadata.month : date.slice(0, 7), value: asNumber(s.net_worth) };
+    }).filter(function(s){ return s.date; })
   };
 }
