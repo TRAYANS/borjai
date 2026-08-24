@@ -4,6 +4,38 @@ import { createLocalStorageRepository } from "../repositories/localStorageReposi
 import { createSupabaseRepository } from "../repositories/supabaseRepository.js";
 import { normalizeState, stateCounts, validateLegacyState } from "../repositories/stateMapper.js";
 
+function today() { return new Date().toISOString().slice(0, 10); }
+function wealthFromState(state) {
+  const accounts = (state.accounts || []).reduce((sum, a) => sum + Number(a.balance || 0), 0);
+  const assets = (state.assets || []).reduce((sum, a) => sum + Number(a.value || 0), 0);
+  const debts = (state.debts || []).reduce((sum, d) => sum + Number(d.balance || d.outstandingBalance || 0), 0);
+  return accounts + assets - debts;
+}
+function ensureDailySnapshot(state) {
+  const next = { ...state, snapshots: Array.isArray(state.snapshots) ? [...state.snapshots] : [] };
+  const date = today();
+  const value = wealthFromState(next);
+  const existing = next.snapshots.find((s) => String(s.date || (s.month ? `${s.month}-01` : "")).slice(0, 10) === date);
+  let changed = false;
+  if (existing) {
+    if (Number(existing.value || existing.net_worth || 0) !== value) {
+      existing.date = date;
+      existing.value = value;
+      delete existing.month;
+      changed = true;
+    }
+  } else {
+    next.snapshots.push({ date, value });
+    changed = true;
+  }
+  next.snapshots.sort((a, b) => String(a.date || a.month || "").localeCompare(String(b.date || b.month || "")));
+  if (next.snapshots.length > 1825) {
+    next.snapshots = next.snapshots.slice(-1825);
+    changed = true;
+  }
+  return { state: next, changed };
+}
+
 export async function createFinancialApi(options) {
   const fallbackFactory = options.fallbackFactory;
   const localKey = options.localKey || LOCAL_STORAGE_KEY;
@@ -25,6 +57,8 @@ export async function createFinancialApi(options) {
       activeRepository = localRepository;
       backendStatus = { mode: "local", connected: false, error: e.message || "No se pudo conectar con Supabase." };
     }
+  } else {
+    backendStatus = { mode: "local", connected: false, error: "Faltan SUPABASE_URL y SUPABASE_ANON_KEY en el entorno de producción." };
   }
 
   async function load() {
@@ -57,12 +91,20 @@ export async function createFinancialApi(options) {
               after: stateCounts(reconciled),
               createdAt: new Date().toISOString()
             });
-            return reconciled;
+            const ensured = ensureDailySnapshot(reconciled);
+            await localRepository.saveState(ensured.state);
+            if (ensured.changed) await activeRepository.saveState(ensured.state);
+            return ensured.state;
           }
         }
       }
 
-      return remote;
+      const ensured = ensureDailySnapshot(remote);
+      await localRepository.saveState(ensured.state);
+      if (activeRepository.kind === "supabase" && ensured.changed) {
+        await activeRepository.saveState(ensured.state);
+      }
+      return ensured.state;
     } catch (e) {
       backendStatus = { mode: "local", connected: false, error: e.message || "Backend no disponible. Usando datos locales." };
       activeRepository = localRepository;
@@ -72,11 +114,12 @@ export async function createFinancialApi(options) {
 
   async function saveState(state) {
     const normalized = normalizeState(state, fallbackFactory);
-    await localRepository.saveState(normalized);
+    const ensured = ensureDailySnapshot(normalized);
+    await localRepository.saveState(ensured.state);
 
     if (activeRepository.kind === "supabase") {
       try {
-        const saved = await activeRepository.saveState(normalized);
+        const saved = await activeRepository.saveState(ensured.state);
         backendStatus = { mode: "supabase", connected: true, error: "" };
         return saved;
       } catch (e) {
@@ -85,7 +128,7 @@ export async function createFinancialApi(options) {
       }
     }
 
-    return normalized;
+    return ensured.state;
   }
 
   async function reset() {
