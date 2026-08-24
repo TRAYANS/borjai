@@ -32,15 +32,10 @@ const CONFLICT_KEYS = {
 
 async function requireUser(client) {
   const result = await client.auth.getUser();
-
   if (result.error) throw result.error;
-
   if (!result.data || !result.data.user) {
-    throw new Error(
-      "No existe una sesión de usuario en Supabase."
-    );
+    throw new Error("No existe una sesión de usuario en Supabase.");
   }
-
   return result.data.user;
 }
 
@@ -49,35 +44,56 @@ async function selectAll(client, table) {
     .from(table)
     .select("*")
     .order("created_at", { ascending: true });
-
   if (result.error) throw result.error;
-
   return result.data || [];
 }
 
+function desiredKey(table, row) {
+  if (table === "categories") return `${row.name || ""}|${row.type || ""}`;
+  return String(row.legacy_id || row.id || "");
+}
+
+function existingKey(table, row) {
+  if (table === "categories") return `${row.name || ""}|${row.type || ""}`;
+  return String(row.legacy_id || row.id || "");
+}
+
+async function deleteStaleRows(client, table, desiredRows) {
+  const query = table === "categories"
+    ? client.from(table).select("id,name,type")
+    : client.from(table).select("id,legacy_id");
+
+  const result = await query;
+  if (result.error) throw result.error;
+
+  const desired = new Set((desiredRows || []).map((row) => desiredKey(table, row)));
+  const staleIds = (result.data || [])
+    .filter((row) => !desired.has(existingKey(table, row)))
+    .map((row) => row.id)
+    .filter(Boolean);
+
+  if (!staleIds.length) return;
+
+  const del = await client.from(table).delete().in("id", staleIds);
+  if (del.error) {
+    throw new Error(`Error eliminando registros obsoletos de ${table}: ${del.error.message}`);
+  }
+}
+
 async function upsertTable(client, table, rows) {
-  if (!rows || rows.length === 0) {
-    return;
-  }
-
+  const desiredRows = rows || [];
   const conflict = CONFLICT_KEYS[table];
+  if (!conflict) throw new Error(`No existe configuración de conflicto para ${table}.`);
 
-  if (!conflict) {
-    throw new Error(
-      `No existe configuración de conflicto para ${table}.`
-    );
-  }
+  await deleteStaleRows(client, table, desiredRows);
+  if (!desiredRows.length) return;
 
   const result = await client
     .from(table)
-    .upsert(rows, {
-      onConflict: conflict
-    });
+    .upsert(desiredRows, { onConflict: conflict });
 
   if (result.error) {
-    throw new Error(
-      `Error guardando ${table}: ${result.error.message}`
-    );
+    throw new Error(`Error guardando ${table}: ${result.error.message}`);
   }
 }
 
@@ -91,60 +107,28 @@ export function createSupabaseRepository(client, fallbackFactory) {
 
     async load() {
       await requireUser(client);
-
       const rows = {};
-
-      for (const table of TABLES) {
-        rows[table] = await selectAll(client, table);
-      }
-
+      for (const table of TABLES) rows[table] = await selectAll(client, table);
       const loaded = fromDatabaseRows(rows, fallbackFactory);
 
-      // Si Supabase todavía no tiene cuentas, conservamos las cuentas
-      // iniciales para que los selectores de origen/destino sigan funcionando.
       if (!Array.isArray(loaded.accounts) || loaded.accounts.length === 0) {
         const fallback = fallbackFactory();
         loaded.accounts = Array.isArray(fallback.accounts) ? fallback.accounts : [];
       }
-
       return loaded;
     },
 
     async saveState(state) {
       const user = await requireUser(client);
-
-      const normalized = normalizeState(
-        state,
-        fallbackFactory
-      );
-
+      const normalized = normalizeState(state, fallbackFactory);
       const validation = validateLegacyState(normalized);
+      if (!validation.ok) throw new Error(validation.errors.join(" "));
+      const rows = toDatabaseRows(normalized, user.id);
 
-      if (!validation.ok) {
-        throw new Error(validation.errors.join(" "));
-      }
-
-      const rows = toDatabaseRows(
-        normalized,
-        user.id
-      );
-
-      /*
-       * IMPORTANTE:
-       *
-       * No hacemos DELETE antes de guardar.
-       *
-       * Cada registro se actualiza o crea mediante UPSERT.
-       * Si una operación falla, los datos existentes
-       * no se destruyen previamente.
-       */
-
+      // Supabase is the source of truth: each save is a full reconciliation.
+      // Rows missing from the desired local state are deleted remotely.
       for (const table of TABLES) {
-        await upsertTable(
-          client,
-          table,
-          rows[table]
-        );
+        await upsertTable(client, table, rows[table]);
       }
 
       return normalized;
@@ -152,59 +136,22 @@ export function createSupabaseRepository(client, fallbackFactory) {
 
     async reset() {
       const user = await requireUser(client);
-
-      /*
-       * El reset sigue siendo una operación destructiva,
-       * por lo que se mantiene separada del guardado normal.
-       */
-
       for (const table of TABLES) {
-        const del = await client
-          .from(table)
-          .delete()
-          .eq("user_id", user.id);
-
-        if (del.error) {
-          throw new Error(
-            `No se pudo limpiar ${table}: ${del.error.message}`
-          );
-        }
+        const del = await client.from(table).delete().eq("user_id", user.id);
+        if (del.error) throw new Error(`No se pudo limpiar ${table}: ${del.error.message}`);
       }
-
       const next = fallbackFactory();
-
       await this.saveState(next);
-
       return next;
     },
 
     async migrateFromLocal(localState) {
-      const normalized = normalizeState(
-        localState,
-        fallbackFactory
-      );
-
-      const validation = validateLegacyState(
-        normalized
-      );
-
-      if (!validation.ok) {
-        return {
-          ok: false,
-          errors: validation.errors
-        };
-      }
-
+      const normalized = normalizeState(localState, fallbackFactory);
+      const validation = validateLegacyState(normalized);
+      if (!validation.ok) return { ok: false, errors: validation.errors };
       await this.saveState(normalized);
-
       const loaded = await this.load();
-
-      return {
-        ok: true,
-        before: stateCounts(normalized),
-        after: stateCounts(loaded),
-        state: loaded
-      };
+      return { ok: true, before: stateCounts(normalized), after: stateCounts(loaded), state: loaded };
     }
   };
 }
