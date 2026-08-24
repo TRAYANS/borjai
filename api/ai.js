@@ -19,11 +19,13 @@ export default async function handler(req, res) {
       return res.status(415).json({ error: "Formato no compatible. La imagen debe llegar como JPG, PNG o WEBP." });
     }
 
-    const prompt = `Analiza esta captura financiera y extrae SOLO datos visibles y verificables. Tu tarea es convertir la captura en datos estructurados para una aplicación financiera personal.
+    const prompt = `You are a financial screenshot OCR extractor.
+Read only information that is visibly present in the image. Never invent values.
+Return exactly ONE valid JSON object and nothing else. No markdown. No code fences. No explanation.
 
-Devuelve SOLO JSON valido con este formato exacto:
+Use exactly these keys:
 {
-  "type": "account_balance|transaction|investment|unknown",
+  "type": "account_balance",
   "institution": null,
   "account": null,
   "date": null,
@@ -37,19 +39,18 @@ Devuelve SOLO JSON valido con este formato exacto:
   "confidence": 0
 }
 
-Reglas:
-- No inventes datos.
-- Usa null si un dato no aparece claramente.
-- amount es el importe de la operacion, no el saldo.
-- balance es el saldo visible de una cuenta.
-- date debe ser YYYY-MM-DD cuando pueda determinarse con seguridad.
-- confidence debe estar entre 0 y 1.
-- Si aparecen varios datos pero no puedes determinar una unica operacion, usa type=unknown y conserva solo los campos inequívocos.`;
+Rules:
+- type must be exactly one of: account_balance, transaction, investment, unknown.
+- Use null when a value is not clearly visible.
+- amount is the transaction/operation amount.
+- balance is the visible account or portfolio balance.
+- date must be YYYY-MM-DD only when it is clearly identifiable.
+- currency should be the visible currency; use EUR only when the image clearly indicates euros or when no other currency is shown.
+- confidence is a number from 0 to 1.
+- Keep numbers as JSON numbers, not strings.
+- If several transactions are visible and one object cannot represent them reliably, use type unknown and keep only the unambiguous account-level information.
+- The final response must be parseable by JSON.parse().`;
 
-    // Para el importador de capturas usamos SIEMPRE el modelo multimodal
-    // actualmente documentado por Groq. No permitimos que una variable de
-    // entorno antigua seleccione Llama 4 Scout/Maverick y rompa la petición.
-    // Qwen 3.6 27B admite imágenes y JSON mode.
     const visionModel = "qwen/qwen3.6-27b";
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -61,6 +62,8 @@ Reglas:
       body: JSON.stringify({
         model: visionModel,
         temperature: 0,
+        reasoning_effort: "none",
+        reasoning_format: "hidden",
         max_completion_tokens: 1000,
         response_format: { type: "json_object" },
         messages: [{
@@ -75,7 +78,8 @@ Reglas:
 
     const payload = await response.json();
     if (!response.ok) {
-      return res.status(response.status).json({ error: payload?.error?.message || "Error de Groq." });
+      const detail = payload?.error?.message || payload?.error?.failed_generation || "Error de Groq.";
+      return res.status(response.status).json({ error: detail });
     }
 
     const content = payload?.choices?.[0]?.message?.content;
