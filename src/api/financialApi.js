@@ -1,4 +1,4 @@
-import { hasSupabaseConfig, LOCAL_BACKUP_KEY, LOCAL_STORAGE_KEY, MIGRATION_STATUS_KEY, readRuntimeConfig } from "../config.js";
+import { hasSupabaseConfig, LOCAL_BACKUP_KEY, LOCAL_STORAGE_KEY, MIGRATION_STATUS_KEY, loadRuntimeConfig } from "../config.js";
 import { createSupabaseClient } from "../db/supabaseClient.js";
 import { createLocalStorageRepository } from "../repositories/localStorageRepository.js";
 import { createSupabaseRepository } from "../repositories/supabaseRepository.js";
@@ -8,7 +8,7 @@ export async function createFinancialApi(options) {
   const fallbackFactory = options.fallbackFactory;
   const localKey = options.localKey || LOCAL_STORAGE_KEY;
   const storage = options.storage;
-  const config = readRuntimeConfig(options.config);
+  const config = await loadRuntimeConfig(options.config);
   const localRepository = createLocalStorageRepository(localKey, fallbackFactory, storage);
   let activeRepository = localRepository;
   let backendStatus = { mode: "local", connected: false, error: "" };
