@@ -11,6 +11,23 @@ export function readRuntimeConfig(source) {
   };
 }
 
+export async function loadRuntimeConfig(source) {
+  const direct = readRuntimeConfig(source);
+  if (direct.supabaseUrl && direct.supabaseAnonKey) return direct;
+
+  try {
+    const response = await fetch("/api/config", { cache: "no-store" });
+    if (response.ok) {
+      const remote = await response.json();
+      return readRuntimeConfig(remote);
+    }
+  } catch (_) {
+    // Keep local fallback when the runtime config endpoint is unavailable.
+  }
+
+  return direct;
+}
+
 export function hasSupabaseConfig(config) {
   return Boolean(config && config.supabaseUrl && config.supabaseAnonKey);
 }
