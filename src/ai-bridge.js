@@ -86,3 +86,16 @@ window.addEventListener("borjai:ai-import", event => {
   if (data.type === "account_balance" && data.balance != null) openBalance(data, payload.fileName || "Importación IA");
   else openTransaction(data, payload.fileName || "Importación IA");
 });
+
+// If the user starts from the normal "Añadir información" flow and selects an image,
+// route it directly to the AI importer instead of showing the old GitHub Pages fallback.
+document.addEventListener("change", event => {
+  const input = event.target;
+  if (input?.id !== "file-input") return;
+  const file = input.files?.[0];
+  if (!file || !String(file.type || "").startsWith("image/")) return;
+  if (window.BorjaAI?.openAiImportWithFile) {
+    event.stopImmediatePropagation();
+    window.BorjaAI.openAiImportWithFile(file);
+  }
+}, true);
