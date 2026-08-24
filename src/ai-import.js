@@ -1,14 +1,25 @@
 const modalId = "ai-import-modal";
 
-function closeAiImport() {
-  document.getElementById(modalId)?.remove();
-}
-
+function closeAiImport() { document.getElementById(modalId)?.remove(); }
 function setStatus(root, text, error = false) {
   const node = root.querySelector("#ai-status");
   if (!node) return;
   node.textContent = text;
   node.style.color = error ? "#ff6974" : "#9da3ad";
+}
+
+async function getSessionToken() {
+  if (window.BORJAI_SESSION_TOKEN) return window.BORJAI_SESSION_TOKEN;
+  try {
+    const mod = await import("./db/supabaseClient.js");
+    const cfg = await import("./config.js");
+    const runtime = await cfg.loadRuntimeConfig();
+    const client = await mod.createSupabaseClient(runtime);
+    const session = await client.auth.getSession();
+    const token = session.data?.session?.access_token || "";
+    if (token) window.BORJAI_SESSION_TOKEN = token;
+    return token;
+  } catch (_) { return ""; }
 }
 
 async function imageToJpegBase64(file) {
@@ -20,7 +31,6 @@ async function imageToJpegBase64(file) {
       img.onerror = () => reject(new Error("El navegador no puede leer esta imagen. En HEIC, prueba a compartirla como JPG o PNG."));
       img.src = objectUrl;
     });
-
     const maxSide = 2400;
     const width = image.naturalWidth || image.width;
     const height = image.naturalHeight || image.height;
@@ -32,9 +42,7 @@ async function imageToJpegBase64(file) {
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
     return { base64: dataUrl.split(",")[1], mimeType: "image/jpeg" };
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+  } finally { URL.revokeObjectURL(objectUrl); }
 }
 
 function openAiImport(initialFile = null) {
@@ -63,49 +71,35 @@ function openAiImport(initialFile = null) {
 
   const fileInput = root.querySelector("#ai-file");
   const analyze = root.querySelector("#ai-analyze");
-  const status = root.querySelector("#ai-status");
   const result = root.querySelector("#ai-result");
   const register = root.querySelector("#ai-register");
   let extracted = null;
 
   root.querySelector("#ai-close").onclick = closeAiImport;
-
   function setFile(file) {
     if (!file) return;
-    try {
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      fileInput.files = dt.files;
-    } catch (_) {
-      // Safari may not allow assigning FileList; initialFile is still retained below.
-    }
+    try { const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; } catch (_) {}
     root.querySelector("#ai-file-label").textContent = file.name;
-    analyze.disabled = false;
-    register.style.display = "none";
-    register.disabled = true;
-    extracted = null;
-    result.style.display = "none";
-    status.textContent = "Archivo listo para analizar.";
+    analyze.disabled = false; register.style.display = "none"; register.disabled = true;
+    extracted = null; result.style.display = "none";
+    setStatus(root, "Archivo listo para analizar.");
   }
-
   fileInput.onchange = () => setFile(fileInput.files?.[0]);
   if (initialFile) setFile(initialFile);
 
   analyze.onclick = async () => {
     const file = fileInput.files?.[0] || initialFile;
     if (!file) return;
-    analyze.disabled = true;
-    register.disabled = true;
-    register.style.display = "none";
-    result.style.display = "none";
+    analyze.disabled = true; register.disabled = true; register.style.display = "none"; result.style.display = "none";
     setStatus(root, "Preparando imagen…");
-
     try {
+      const token = await getSessionToken();
+      if (!token) throw new Error("No hay sesión de Supabase disponible. Recarga la aplicación e inténtalo de nuevo.");
       const prepared = await imageToJpegBase64(file);
       setStatus(root, "Analizando captura con Groq…");
       const response = await fetch("/api/ai", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ image: prepared.base64, mimeType: prepared.mimeType })
       });
       const payload = await response.json().catch(() => ({}));
@@ -113,28 +107,21 @@ function openAiImport(initialFile = null) {
       extracted = payload.data;
       setStatus(root, "Datos detectados. Revísalos antes de guardarlos.");
       result.textContent = JSON.stringify(extracted, null, 2);
-      result.style.display = "block";
-      register.style.display = "block";
-      register.disabled = false;
+      result.style.display = "block"; register.style.display = "block"; register.disabled = false;
     } catch (error) {
       setStatus(root, error.message || "Error al analizar la imagen.", true);
-    } finally {
-      analyze.disabled = false;
-    }
+    } finally { analyze.disabled = false; }
   };
 
   register.onclick = () => {
     if (!extracted) return;
-    window.dispatchEvent(new CustomEvent("borjai:ai-import", {
-      detail: { data: extracted, fileName: fileInput.files?.[0]?.name || initialFile?.name || "Importación IA" }
-    }));
+    window.dispatchEvent(new CustomEvent("borjai:ai-import", { detail: { data: extracted, fileName: fileInput.files?.[0]?.name || initialFile?.name || "Importación IA" } }));
     closeAiImport();
   };
 }
 
 window.BorjaAI = window.BorjaAI || {};
 window.BorjaAI.openAiImportWithFile = openAiImport;
-
 document.addEventListener("click", event => {
   const trigger = event.target.closest('[data-action="open-ai-import"]');
   if (trigger) openAiImport();
