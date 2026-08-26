@@ -105,6 +105,12 @@ export function createSupabaseRepository(client, fallbackFactory) {
       return requireUser(client);
     },
 
+    async getAccessToken() {
+      const result = await client.auth.getSession();
+      if (result.error) throw result.error;
+      return result.data?.session?.access_token || "";
+    },
+
     async load() {
       await requireUser(client);
       const rows = {};
@@ -125,8 +131,6 @@ export function createSupabaseRepository(client, fallbackFactory) {
       if (!validation.ok) throw new Error(validation.errors.join(" "));
       const rows = toDatabaseRows(normalized, user.id);
 
-      // Supabase is the source of truth: each save is a full reconciliation.
-      // Rows missing from the desired local state are deleted remotely.
       for (const table of TABLES) {
         await upsertTable(client, table, rows[table]);
       }
