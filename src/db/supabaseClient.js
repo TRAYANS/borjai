@@ -19,6 +19,10 @@ function writeSession(session) {
   }
 }
 
+function queryError(data, status) {
+  return new Error(data?.message || data?.error_description || data?.hint || data?.details || `Supabase ${status}`);
+}
+
 function createQuery(baseUrl, anonKey, token, table) {
   const headers = {
     apikey: anonKey,
@@ -26,26 +30,44 @@ function createQuery(baseUrl, anonKey, token, table) {
     Accept: "application/json"
   };
 
-  return {
+  function request(url, options = {}) {
+    return fetch(url, { ...options, cache: "no-store" });
+  }
+
+  const builder = {
     select(columns = "*") {
-      return {
+      const state = { columns, filters: [], order: null };
+      const chain = {
+        eq(column, value) {
+          state.filters.push([column, `eq.${value}`]);
+          return chain;
+        },
+        in(column, values) {
+          const list = Array.isArray(values) ? values.filter((value) => value != null).map(String) : [];
+          if (!list.length) return chain;
+          state.filters.push([column, `in.(${list.map((value) => `"${value.replaceAll('"', '\\"')}"`).join(",")})`]);
+          return chain;
+        },
         order(column = "created_at", options = {}) {
+          state.order = `${column}.${options.ascending === false ? "desc" : "asc"}`;
           const url = new URL(`/rest/v1/${table}`, baseUrl);
-          url.searchParams.set("select", columns);
-          url.searchParams.set("order", `${column}.${options.ascending === false ? "desc" : "asc"}`);
-          return fetch(url, { headers, cache: "no-store" }).then(async (response) => {
+          url.searchParams.set("select", state.columns);
+          state.filters.forEach(([key, value]) => url.searchParams.set(key, value));
+          if (state.order) url.searchParams.set("order", state.order);
+          return request(url, { headers }).then(async (response) => {
             const data = await response.json().catch(() => []);
-            if (!response.ok) throw new Error(data?.message || data?.error_description || `Supabase ${response.status}`);
+            if (!response.ok) throw queryError(data, response.status);
             return { data: Array.isArray(data) ? data : [], error: null };
           });
         }
       };
+      return chain;
     },
 
     upsert(rows, options = {}) {
       const url = new URL(`/rest/v1/${table}`, baseUrl);
       if (options.onConflict) url.searchParams.set("on_conflict", options.onConflict);
-      return fetch(url, {
+      return request(url, {
         method: "POST",
         headers: {
           ...headers,
@@ -55,31 +77,41 @@ function createQuery(baseUrl, anonKey, token, table) {
         body: JSON.stringify(rows)
       }).then(async (response) => {
         const data = await response.json().catch(() => null);
-        if (!response.ok) return { data: null, error: new Error(data?.message || data?.hint || data?.details || `Supabase ${response.status}`) };
+        if (!response.ok) return { data: null, error: queryError(data, response.status) };
         return { data, error: null };
       });
     },
 
     delete() {
-      return {
+      const state = { filters: [] };
+      const chain = {
         eq(column, value) {
+          state.filters.push([column, `eq.${value}`]);
+          return chain;
+        },
+        in(column, values) {
+          const list = Array.isArray(values) ? values.filter((value) => value != null).map(String) : [];
+          if (list.length) state.filters.push([column, `in.(${list.map((value) => `"${value.replaceAll('"', '\\"')}"`).join(",")})`]);
+          return chain;
+        },
+        then(resolve, reject) {
           const url = new URL(`/rest/v1/${table}`, baseUrl);
-          url.searchParams.set(column, `eq.${value}`);
-          return fetch(url, {
+          state.filters.forEach(([key, value]) => url.searchParams.set(key, value));
+          return request(url, {
             method: "DELETE",
-            headers: {
-              ...headers,
-              Prefer: "return=minimal"
-            }
+            headers: { ...headers, Prefer: "return=minimal" }
           }).then(async (response) => {
             const data = await response.json().catch(() => null);
-            if (!response.ok) return { data: null, error: new Error(data?.message || data?.hint || data?.details || `Supabase ${response.status}`) };
+            if (!response.ok) return { data: null, error: queryError(data, response.status) };
             return { data, error: null };
-          });
+          }).then(resolve, reject);
         }
       };
+      return chain;
     }
   };
+
+  return builder;
 }
 
 async function authRequest(baseUrl, anonKey, path, options = {}) {
@@ -172,7 +204,7 @@ export async function createSupabaseClient(config) {
           cache: "no-store"
         });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok) return { data: { user: null }, error: new Error(data?.msg || data?.message || `Supabase Auth ${response.status}`) };
+        if (!response.ok) return { data: { user: null }, error: queryError(data, response.status) };
         session.user = data;
         writeSession(session);
         return { data: { user: data }, error: null };
