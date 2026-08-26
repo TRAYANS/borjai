@@ -39,10 +39,11 @@ async function requireUser(client) {
   return result.data.user;
 }
 
-async function selectAll(client, table) {
+async function selectAll(client, table, userId) {
   const result = await client
     .from(table)
     .select("*")
+    .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (result.error) throw result.error;
   return result.data || [];
@@ -58,12 +59,12 @@ function existingKey(table, row) {
   return String(row.legacy_id || row.id || "");
 }
 
-async function deleteStaleRows(client, table, desiredRows) {
+async function deleteStaleRows(client, table, desiredRows, userId) {
   const query = table === "categories"
-    ? client.from(table).select("id,name,type")
-    : client.from(table).select("id,legacy_id");
+    ? client.from(table).select("id,name,type").eq("user_id", userId)
+    : client.from(table).select("id,legacy_id").eq("user_id", userId);
 
-  const result = await query;
+  const result = await query.order("created_at", { ascending: true });
   if (result.error) throw result.error;
 
   const desired = new Set((desiredRows || []).map((row) => desiredKey(table, row)));
@@ -74,18 +75,18 @@ async function deleteStaleRows(client, table, desiredRows) {
 
   if (!staleIds.length) return;
 
-  const del = await client.from(table).delete().in("id", staleIds);
+  const del = await client.from(table).delete().eq("user_id", userId).in("id", staleIds);
   if (del.error) {
     throw new Error(`Error eliminando registros obsoletos de ${table}: ${del.error.message}`);
   }
 }
 
-async function upsertTable(client, table, rows) {
+async function upsertTable(client, table, rows, userId) {
   const desiredRows = rows || [];
   const conflict = CONFLICT_KEYS[table];
   if (!conflict) throw new Error(`No existe configuración de conflicto para ${table}.`);
 
-  await deleteStaleRows(client, table, desiredRows);
+  await deleteStaleRows(client, table, desiredRows, userId);
   if (!desiredRows.length) return;
 
   const result = await client
@@ -112,9 +113,9 @@ export function createSupabaseRepository(client, fallbackFactory) {
     },
 
     async load() {
-      await requireUser(client);
+      const user = await requireUser(client);
       const rows = {};
-      for (const table of TABLES) rows[table] = await selectAll(client, table);
+      for (const table of TABLES) rows[table] = await selectAll(client, table, user.id);
       const loaded = fromDatabaseRows(rows, fallbackFactory);
 
       if (!Array.isArray(loaded.accounts) || loaded.accounts.length === 0) {
@@ -132,7 +133,7 @@ export function createSupabaseRepository(client, fallbackFactory) {
       const rows = toDatabaseRows(normalized, user.id);
 
       for (const table of TABLES) {
-        await upsertTable(client, table, rows[table]);
+        await upsertTable(client, table, rows[table], user.id);
       }
 
       return normalized;
