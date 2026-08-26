@@ -85,7 +85,7 @@ async function askCoach(question) {
   });
   const statePayload = await stateResponse.json().catch(() => ({}));
   if (!stateResponse.ok || !statePayload.state) throw new Error(statePayload?.error || "No se pudo cargar tu situación financiera desde Supabase.");
-  const response = await fetch("/api/coach", {
+  const response = await fetch("/api/coach-v18", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ question, context: contextFromState(statePayload.state), useWeb: true })
