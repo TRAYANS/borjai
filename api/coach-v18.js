@@ -206,7 +206,7 @@ export default async function handler(req, res) {
       } catch (_) {}
     } else if (process.env.ANTHROPIC_API_KEY && successful.some((x) => x.provider === "anthropic")) {
       try {
-        answer = await anthropic({ apiKey: process.env.ANTHROPIC_JUDGE_MODEL || process.env.ANTHROPIC_COACH_MODEL || "claude-3-5-sonnet-latest", model: process.env.ANTHROPIC_JUDGE_MODEL || process.env.ANTHROPIC_COACH_MODEL || "claude-3-5-sonnet-latest", system: SYNTHESIS_SYSTEM, user: synthesisUser });
+        answer = await anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_JUDGE_MODEL || process.env.ANTHROPIC_COACH_MODEL || "claude-3-5-sonnet-latest", system: SYNTHESIS_SYSTEM, user: synthesisUser });
         judge = "anthropic-judge";
       } catch (_) {}
     }
