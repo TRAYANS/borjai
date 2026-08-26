@@ -1,4 +1,5 @@
 import { CATEGORIES } from "./importer.js";
+import { createFinancialApi } from "./api/financialApi.js";
 
 const KEY = "borjai:mvp:v1";
 const esc = (v) => String(v ?? "").replace(/[&<>\"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#039;" }[c]));
@@ -49,28 +50,43 @@ function openBatch(data, fileName) {
   root.querySelector("[data-ai-batch-confirm]").addEventListener("click", () => confirmBatch(root, rows));
 }
 
-function confirmBatch(root, rows) {
-  const state = readState();
-  if (!state || state.version !== 1) return;
-  const accountMap = new Map((state.accounts || []).map(a => [a.id, a]));
+async function persistState(mutator) {
+  const local = readState();
+  if (!local || local.version !== 1) throw new Error("No existe un estado financiero válido para incorporar la importación.");
+  const api = await createFinancialApi({ localKey: KEY, fallbackFactory: () => local });
+  const state = await api.load();
+  await mutator(state);
+  await api.saveState(state);
+}
+
+async function confirmBatch(root, rows) {
   const controls = root.querySelectorAll("[data-ai-batch]");
   const edits = rows.map((row,index) => {
     const out = { ...row };
     controls.forEach(input => { if (Number(input.dataset.aiBatch) === index) out[input.dataset.field] = input.value; });
     return out;
   });
-  state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
-  edits.forEach(row => {
-    const raw = Number(row.amount || 0);
-    const type = raw < 0 ? "expense" : "income";
-    const signed = type === "expense" ? -Math.abs(raw) : Math.abs(raw);
-    const account = accountMap.get(row.accountId) || state.accounts?.[0];
-    if (account) account.balance = Number(account.balance || 0) + signed;
-    state.transactions.push({ id:`ai-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, date:row.date||today(), merchant:row.description||"Movimiento IA", description:row.description||"Movimiento IA", amount:signed, type, category:type==="income"?"Ingresos":row.category||"Otros", accountId:account?.id||"", source:"ai" });
-  });
-  localStorage.setItem(KEY, JSON.stringify(state));
-  close();
-  window.location.reload();
+  const button = root.querySelector("[data-ai-batch-confirm]");
+  if (button) { button.disabled = true; button.textContent = "Guardando en Supabase…"; }
+  try {
+    await persistState(async (state) => {
+      const accountMap = new Map((state.accounts || []).map(a => [a.id, a]));
+      state.transactions = Array.isArray(state.transactions) ? state.transactions : [];
+      edits.forEach(row => {
+        const raw = Number(row.amount || 0);
+        const type = raw < 0 ? "expense" : "income";
+        const signed = type === "expense" ? -Math.abs(raw) : Math.abs(raw);
+        const account = accountMap.get(row.accountId) || state.accounts?.[0];
+        if (account) account.balance = Number(account.balance || 0) + signed;
+        state.transactions.push({ id:`ai-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, date:row.date||today(), merchant:row.description||"Movimiento IA", description:row.description||"Movimiento IA", amount:signed, type, category:type==="income"?"Ingresos":row.category||"Otros", accountId:account?.id||"", source:"ai" });
+      });
+    });
+    close();
+    window.location.reload();
+  } catch (error) {
+    if (button) { button.disabled = false; button.textContent = `Reintentar ${edits.length} movimientos`; }
+    window.alert(error.message || "No se pudo guardar la importación en Supabase.");
+  }
 }
 
 window.addEventListener("borjai:ai-import", event => {
