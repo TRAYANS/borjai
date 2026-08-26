@@ -46,9 +46,7 @@ export async function createFinancialApi(options) {
   let backendStatus = { mode: "local", connected: false, error: "" };
 
   async function connectBackend() {
-    if (!hasSupabaseConfig(config)) {
-      throw new Error("Supabase no está configurado en producción.");
-    }
+    if (!hasSupabaseConfig(config)) throw new Error("Supabase no está configurado en producción.");
     const client = await createSupabaseClient(config);
     if (!client) throw new Error("No se pudo crear el cliente Supabase.");
     const repo = createSupabaseRepository(client, fallbackFactory);
@@ -58,11 +56,8 @@ export async function createFinancialApi(options) {
     return repo;
   }
 
-  try {
-    await connectBackend();
-  } catch (e) {
-    backendStatus = { mode: "local", connected: false, error: e.message || "No se pudo conectar con Supabase." };
-  }
+  try { await connectBackend(); }
+  catch (e) { backendStatus = { mode: "local", connected: false, error: e.message || "No se pudo conectar con Supabase." }; }
 
   async function loadFromBackend() {
     const repo = activeRepository.kind === "supabase" ? activeRepository : await connectBackend();
@@ -90,13 +85,7 @@ export async function createFinancialApi(options) {
           localRepository.backup(LOCAL_BACKUP_KEY);
           await activeRepository.migrateFromLocal(localNormalized);
           const reconciled = await activeRepository.load();
-          localRepository.setMigrationStatus(MIGRATION_STATUS_KEY, {
-            ok: true,
-            reason: "reconciled_local_changes",
-            before: localCounts,
-            after: stateCounts(reconciled),
-            createdAt: new Date().toISOString()
-          });
+          localRepository.setMigrationStatus(MIGRATION_STATUS_KEY, { ok: true, reason: "reconciled_local_changes", before: localCounts, after: stateCounts(reconciled), createdAt: new Date().toISOString() });
           const ensured = ensureDailySnapshot(reconciled);
           await localRepository.saveState(ensured.state);
           if (ensured.changed) await activeRepository.saveState(ensured.state);
@@ -118,7 +107,6 @@ export async function createFinancialApi(options) {
     const normalized = normalizeState(state, fallbackFactory);
     const ensured = ensureDailySnapshot(normalized);
     await localRepository.saveState(ensured.state);
-
     try {
       if (activeRepository.kind !== "supabase") await connectBackend();
       const saved = await activeRepository.saveState(ensured.state);
@@ -162,6 +150,12 @@ export async function createFinancialApi(options) {
     }
   }
 
+  async function getAccessToken() {
+    if (activeRepository.kind !== "supabase") await connectBackend();
+    if (typeof activeRepository.getAccessToken !== "function") throw new Error("No se pudo obtener la sesión de Supabase.");
+    return activeRepository.getAccessToken();
+  }
+
   return {
     load,
     saveState,
@@ -169,9 +163,7 @@ export async function createFinancialApi(options) {
     migrateLocalState,
     backendStatus: () => backendStatus,
     migrationStatus: () => localRepository.getMigrationStatus(MIGRATION_STATUS_KEY),
-    reconnect: async () => {
-      await connectBackend();
-      return backendStatus;
-    }
+    reconnect: async () => { await connectBackend(); return backendStatus; },
+    getAccessToken
   };
 }
