@@ -16,13 +16,17 @@ export async function loadRuntimeConfig(source) {
   if (direct.supabaseUrl && direct.supabaseAnonKey) return direct;
 
   try {
-    const response = await fetch("/api/config", { cache: "no-store" });
+    const response = await fetch(`/api/config?ts=${Date.now()}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" }
+    });
     if (response.ok) {
-      const remote = await response.json();
-      return readRuntimeConfig(remote);
+      const remotePayload = await response.json();
+      const remote = readRuntimeConfig(remotePayload);
+      if (remote.supabaseUrl && remote.supabaseAnonKey) return remote;
     }
   } catch (_) {
-    // Keep local fallback when the runtime config endpoint is unavailable.
+    // Keep the local fallback when the runtime config endpoint is unavailable.
   }
 
   return direct;
