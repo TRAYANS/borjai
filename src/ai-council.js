@@ -1,13 +1,5 @@
-const STORAGE_KEY = "borjai:mvp:v1";
 const SESSION_KEY = "borjai:supabase:session:v1";
 const AUTH_KEY_HINT = "sb-";
-
-function readState() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    return raw && typeof raw === "object" ? raw : {};
-  } catch (_) { return {}; }
-}
 
 function readAccessToken() {
   try {
@@ -80,10 +72,16 @@ function replaceMessage(text, loading = false) {
 async function askCouncil(question) {
   const token = readAccessToken();
   if (!token) throw new Error("No encuentro la sesión de Supabase en este navegador. Recarga la app e inténtalo de nuevo.");
+  const stateResponse = await fetch("/api/state", {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  const statePayload = await stateResponse.json().catch(() => ({}));
+  if (!stateResponse.ok || !statePayload.state) throw new Error(statePayload?.error || "No se pudo cargar el contexto financiero desde Supabase.");
   const response = await fetch("/api/coach", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ question, context: contextFromState(readState()), useWeb: true })
+    body: JSON.stringify({ question, context: contextFromState(statePayload.state), useWeb: true })
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error || "No se pudo consultar el consejo IA.");

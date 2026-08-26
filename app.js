@@ -100,57 +100,24 @@ function need(category) { return ["Vivienda","Alimentacion","Gasolina","Transpor
 function labelMonth(value) { const parts=value.split("-").map(Number); return new Intl.DateTimeFormat("es-ES",{month:"long",year:"numeric"}).format(new Date(parts[0],parts[1]-1,1)); }
 
 function seed() {
-  const snapshotBase = [100200,101850,103100,105400,107900,109350,111900,113400,116800,119700,123450,126400];
-  const snapshots = snapshotBase.map(function(value,index){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-(11-index)); return {month:iso(d).slice(0,7),value:value}; });
   return {
     version:1,
     profile:{name:"Borja",risk:"Moderado",emergency:3,contribution:300,liveCoach:false},
-    accounts:[
-      {id:"santander",name:"Santander",kind:"bank",balance:14250},
-      {id:"bbva",name:"BBVA",kind:"bank",balance:8600},
-      {id:"revolut",name:"Revolut",kind:"bank",balance:5000},
-      {id:"cash",name:"Efectivo",kind:"cash",balance:8190}
-    ],
-    assets:[
-      {id:"etf",name:"ETF MSCI World",ticker:"IWDA",group:"Inversiones",type:"ETF",value:38000,cost:34600},
-      {id:"stocks",name:"Acciones globales",ticker:"MIX",group:"Inversiones",type:"Acciones",value:12000,cost:11100},
-      {id:"btc",name:"Bitcoin",ticker:"BTC",group:"Criptomonedas",type:"Cripto",value:18000,cost:18600},
-      {id:"eth",name:"Ethereum",ticker:"ETH",group:"Criptomonedas",type:"Cripto",value:2300,cost:1980},
-      {id:"gold",name:"Oro fisico",ticker:"XAU",group:"Oro y Metales",type:"Metal",value:10200,cost:9400},
-      {id:"car",name:"Vehiculo",ticker:"",group:"Otros Activos",type:"Vehiculo",value:7000,cost:9000},
-      {id:"other",name:"Otros activos",ticker:"",group:"Otros Activos",type:"Otros",value:5000,cost:5000}
-    ],
+    accounts:[],
+    assets:[],
     debts:[],
-    transactions:[
-      {id:"a1",date:sameMonth(0,2),merchant:"Nomina",description:"Nomina mensual",amount:2700,type:"income",category:"Ingresos",accountId:"santander"},
-      {id:"a2",date:sameMonth(0,6),merchant:"Proyecto freelance",description:"Ingreso adicional",amount:310,type:"income",category:"Ingresos",accountId:"revolut"},
-      {id:"a3",date:sameMonth(0,3),merchant:"Alquiler",description:"Vivienda",amount:-790,type:"expense",category:"Vivienda",accountId:"santander"},
-      {id:"a4",date:sameMonth(0,5),merchant:"MERCADONA",description:"Compra semanal",amount:-304,type:"expense",category:"Alimentacion",accountId:"santander"},
-      {id:"a5",date:sameMonth(0,7),merchant:"REPSOL",description:"Combustible",amount:-96,type:"expense",category:"Gasolina",accountId:"santander"},
-      {id:"a6",date:sameMonth(0,9),merchant:"NETFLIX",description:"Suscripcion",amount:-17.99,type:"expense",category:"Suscripciones",accountId:"revolut"},
-      {id:"a7",date:sameMonth(0,11),merchant:"UBER",description:"Trayecto",amount:-46.4,type:"expense",category:"Transporte",accountId:"revolut"},
-      {id:"a8",date:sameMonth(0,14),merchant:"Restaurante",description:"Cena",amount:-132,type:"expense",category:"Restaurantes",accountId:"revolut"},
-      {id:"a9",date:sameMonth(0,15),merchant:"Gimnasio",description:"Cuota mensual",amount:-45,type:"expense",category:"Salud",accountId:"santander"},
-      {id:"a10",date:sameMonth(0,16),merchant:"AMAZON",description:"Compra online",amount:-91,type:"expense",category:"Compras",accountId:"santander"},
-      {id:"a11",date:sameMonth(0,18),merchant:"MAPFRE",description:"Seguro",amount:-62,type:"expense",category:"Seguros",accountId:"santander"},
-      {id:"a12",date:sameMonth(0,20),merchant:"Ocio",description:"Fin de semana",amount:-118,type:"expense",category:"Ocio",accountId:"revolut"},
-      {id:"a13",date:sameMonth(0,21),merchant:"MyInvestor",description:"Aportacion ETF",amount:-300,type:"investment_buy",category:"Inversiones",accountId:"santander"},
-      {id:"b1",date:sameMonth(-1,2),merchant:"Nomina",description:"Nomina mensual",amount:2700,type:"income",category:"Ingresos",accountId:"santander"},
-      {id:"b2",date:sameMonth(-1,3),merchant:"Alquiler",description:"Vivienda",amount:-790,type:"expense",category:"Vivienda",accountId:"santander"},
-      {id:"b3",date:sameMonth(-1,8),merchant:"MERCADONA",description:"Alimentacion",amount:-278,type:"expense",category:"Alimentacion",accountId:"santander"},
-      {id:"b4",date:sameMonth(-1,16),merchant:"Ocio",description:"Ocio",amount:-80,type:"expense",category:"Ocio",accountId:"revolut"}
-    ],
-    goals:[
-      {id:"g1",name:"Fondo de emergencia",target:9000,current:8190,date:sameMonth(8,1),priority:"Alta"},
-      {id:"g2",name:"Viaje a Japon",target:3500,current:1450,date:sameMonth(10,15),priority:"Media"},
-      {id:"g3",name:"Invertir este ano",target:5000,current:2700,date:sameMonth(4,28),priority:"Alta"}
-    ],
-    imports:[], snapshots:snapshots
+    transactions:[],
+    goals:[],
+    imports:[],
+    snapshots:[]
   };
 }
 async function load(){ return api.load(); }
 function save(){
-  api.saveState(state).then(function(next){ state = next; renderVersion(); }).catch(function(e){ toast(e.message || "No se pudo guardar.", true); });
+  api.saveState(state).then(function(next){ state = next; publishState(); renderVersion(); }).catch(function(e){
+    toast(e.message || "No se pudo guardar.", true);
+    api.load().then(function(next){ state = next; render(); }).catch(function(){ render(); });
+  });
 }
 async function resetState(){
   try{
@@ -158,7 +125,7 @@ async function resetState(){
     chat = [];
     close();
     render();
-    toast("Datos de ejemplo restablecidos.");
+    toast("Datos financieros restablecidos.");
   }catch(e){toast(e.message||"No se pudo restablecer.",true);}
 }
 
@@ -180,13 +147,24 @@ function expenseCategories(){
 function alertList(){
   const m=metrics(nowMonth()), h=health(), category=expenseCategories(), out=[];
   const discretionary=category.filter(function(c){return !need(c.name);}).reduce(function(s,c){return s+c.value;},0);
+  const netWorth = wealth();
+  const cryptoRatio = netWorth ? group("Criptomonedas")/netWorth : 0;
   if(m.rate<.15) out.push({level:"warn",title:"Tasa de ahorro baja",text:"Estas ahorrando "+percent(m.rate)+" este mes; el objetivo es al menos 15%."});
   if(discretionary>m.expense*.28) out.push({level:"warn",title:"Gasto discrecional elevado",text:money(discretionary)+" corresponde a ocio, compras, viajes y restaurantes."});
   if(h.liquid<h.target) out.push({level:"danger",title:"Reserva incompleta",text:"La liquidez no alcanza el objetivo configurado."});
-  if(group("Criptomonedas")/wealth()>.15) out.push({level:"warn",title:"Exposicion a cripto relevante",text:"Criptomonedas representa "+percent(group("Criptomonedas")/wealth())+" del patrimonio."});
+  if(cryptoRatio>.15) out.push({level:"warn",title:"Exposicion a cripto relevante",text:"Criptomonedas representa "+percent(cryptoRatio)+" del patrimonio."});
   return out.length?out:[{level:"good",title:"Situacion estable",text:"No hay alertas relevantes que requieran accion hoy."}];
 }
-function snapshot(){ const key=nowMonth(), existing=state.snapshots.find(function(s){return s.month===key;}); if(existing) existing.value=wealth(); else state.snapshots.push({month:key,value:wealth()}); state.snapshots=state.snapshots.slice(-12); }
+function snapshot(){
+  const dateKey=iso(new Date()), monthKey=dateKey.slice(0,7);
+  const existing=state.snapshots.find(function(s){return String(s.date||"").slice(0,10)===dateKey || (!s.date&&s.month===monthKey);});
+  if(existing){existing.date=dateKey;existing.month=monthKey;existing.value=wealth();existing.source=existing.source||"app";}
+  else state.snapshots.push({date:dateKey,month:monthKey,value:wealth(),source:"app"});
+  state.snapshots=state.snapshots
+    .filter(function(s){return s && (s.date||s.month) && Number.isFinite(Number(s.value));})
+    .sort(function(a,b){return String(a.date||a.month).localeCompare(String(b.date||b.month));})
+    .slice(-1825);
+}
 function dot(score){return score>=75?"good":score>=50?"warn":"danger";}
 function typeName(t){return {income:"Ingreso",expense:"Gasto",investment_buy:"Inversion",investment_sell:"Venta",investment:"Inversion",transfer:"Transferencia",dividend:"Dividendo",fee:"Comision"}[t]||"Movimiento";}
 function badge(t){const cls=t==="income"||t==="dividend"?"badge-income":t==="expense"||t==="fee"?"badge-expense":"badge-investment";return '<span class="badge '+cls+'">'+typeName(t)+'</span>';}
@@ -197,11 +175,16 @@ function coachVisual(className){return '<div class="'+className+'" aria-hidden="
 function backendNotice(){
   const status=api.backendStatus();
   if(status.connected) return '<div class="backend-status backend-online"><span data-icon="check"></span><span>Backend conectado · Supabase</span></div>';
-  return '<div class="backend-status"><span data-icon="info"></span><span>Modo local activo. Tus datos siguen en este navegador.'+(status.error?" "+safe(status.error):"")+'</span></div>';
+  if(status.mode==="local") return '<div class="backend-status backend-online"><span data-icon="info"></span><span>Modo local de desarrollo. Los datos se guardan solo en este navegador.</span></div>';
+  return '<div class="backend-status backend-error"><span data-icon="alert"></span><span>Backend no disponible. Los datos de Supabase no se pueden cargar ni guardar ahora.'+(status.error?" "+safe(status.error):"")+'</span></div>';
 }
 function renderVersion(){
   const el=document.getElementById("app-version");
   if(el) el.textContent=appSignature();
+}
+function publishState(){
+  window.BORJAI_STATE = state;
+  window.dispatchEvent(new CustomEvent("borjai:state", { detail: state }));
 }
 function chart(){
   const snapshots = Array.isArray(state.snapshots) ? state.snapshots : [];
@@ -298,7 +281,7 @@ function miniChart(){
 function table(list,actions){
   if(!list.length) return '<div class="table-empty"><span data-icon="receipt"></span><p>No hay movimientos con este filtro.</p></div>';
   return '<div class="table-shell"><table class="data-table"><thead><tr><th>Fecha</th><th>Concepto</th><th>Tipo</th><th>Categoria</th><th>Cuenta</th><th class="align-right">Importe</th>'+(actions?"<th></th>":"")+'</tr></thead><tbody>'+list.map(function(t){
-    return '<tr><td>'+date(t.date)+'</td><td><strong>'+safe(t.merchant)+'</strong><br><span class="panel-note">'+safe(t.description||t.category)+'</span></td><td>'+badge(t.type)+'</td><td>'+safe(t.category)+'</td><td>'+accountName(t.accountId)+'</td><td class="align-right '+(t.amount>=0?"amount-positive":"amount-negative")+'">'+signed(t.amount)+'</td>'+(actions?'<td class="align-right"><button class="row-action" data-action="delete" data-id="'+t.id+'" aria-label="Eliminar"><span data-icon="trash"></span></button></td>':"")+'</tr>';
+    return '<tr><td>'+date(t.date)+'</td><td><strong>'+safe(t.merchant)+'</strong><br><span class="panel-note">'+safe(t.description||t.category)+'</span></td><td>'+badge(t.type)+'</td><td>'+safe(t.category)+'</td><td>'+accountName(t.accountId)+'</td><td class="align-right '+(t.amount>=0?"amount-positive":"amount-negative")+'">'+signed(t.amount)+'</td>'+(actions?'<td class="align-right"><button class="row-action" data-action="edit-movement" data-id="'+t.id+'" aria-label="Editar"><span data-icon="settings"></span></button><button class="row-action" data-action="delete" data-id="'+t.id+'" aria-label="Eliminar"><span data-icon="trash"></span></button></td>':"")+'</tr>';
   }).join("")+'</tbody></table></div>';
 }
 function insight(m,h){
@@ -307,12 +290,13 @@ function insight(m,h){
 }
 function dashboard(){
   const m=metrics(nowMonth()), old=metrics(previousMonth()), h=health(), r=recommendation(), w=wealth(), snapshots=Array.isArray(state.snapshots)?state.snapshots:[], prior=snapshots.length>1?(Number(snapshots[snapshots.length-2].value)||0):w, change=w-prior, allocation=allocations(), total=allocation.reduce(function(s,a){return s+a.value;},0);
-  let acc=0, vars=allocation.map(function(a,i){acc+=a.value;return "--c"+(i+1)+":"+a.color+";--p"+(i+1)+":"+(acc/total*100).toFixed(2)+"%;";}).join("");
-  const rows=allocation.map(function(a){return '<div class="allocation-row"><i style="--color:'+a.color+'"></i><span>'+a.name+'</span><strong>'+money(a.value)+' <span class="panel-note">'+percent(a.value/total)+'</span></strong></div>';}).join("");
+  let acc=0, vars=total?allocation.map(function(a,i){acc+=a.value;return "--c"+(i+1)+":"+a.color+";--p"+(i+1)+":"+(acc/total*100).toFixed(2)+"%;";}).join(""):"";
+  const rows=total?allocation.map(function(a){return '<div class="allocation-row"><i style="--color:'+a.color+'"></i><span>'+a.name+'</span><strong>'+money(a.value)+' <span class="panel-note">'+percent(a.value/total)+'</span></strong></div>';}).join(""):'<div class="table-empty">Aun no hay patrimonio registrado.</div>';
   const quick=[["Donde invierto este mes?","inversion","trend"],["Como va mi patrimonio?","patrimonio","chart"],["Que gastos puedo recortar?","gastos","receipt"],["Riesgos detectados","riesgos","alert"]].map(function(q){return '<button class="quick-chip" data-action="ask" data-q="'+q[1]+'"><span data-icon="'+q[2]+'"></span>'+q[0]+'</button>';}).join("");
+  const changeRate = prior ? percent(change/prior) : "sin histórico";
   return '<section class="view">'+head("Panel de control","Tu dinero, con contexto","Asi estas en "+labelMonth(nowMonth()),'<button class="btn" data-action="movement"><span data-icon="plus"></span>Registrar movimiento</button><button class="btn btn-primary" data-view="importar"><span data-icon="upload"></span>Anadir informacion</button>')+backendNotice()+
-    '<div class="dashboard-grid"><div class="hero-metrics"><section class="wealth-panel"><div class="metric-label">Patrimonio neto</div><div class="wealth-value">'+money(w)+'</div><div class="metric-delta '+(change<0?"is-down":"")+'"><strong>'+signed(change)+" ("+percent(change/prior)+')</strong><span>este mes</span></div><p class="metric-subline"><b>'+money(m.savings)+'</b> de ahorro, <b>'+money(m.invested)+'</b> aportados a cartera.</p>'+miniChart()+'</section><section class="health-panel">'+ring(h.score)+'<p class="health-caption">'+(h.score>=75?"Base financiera solida":"Hay palancas claras de mejora")+'</p></section></div>'+
-    '<div class="dashboard-two"><section class="chart-panel"><div class="panel-head"><div><h2 class="panel-title">Evolucion del patrimonio</h2><span class="panel-note">Ultimos 12 meses</span></div><select class="period-select"><option>12 meses</option></select></div>'+chart()+'</section><section class="recommendation-panel"><div class="recommendation-top"><div class="recommendation-icon"><span data-icon="sparkles"></span></div><div><div class="section-kicker">Que haria hoy</div><h2>'+r.title+'</h2></div></div><p>'+r.text+'</p><div class="recommendation-facts"><div class="fact"><span>Propuesta</span><strong>'+r.main+'</strong></div><div class="fact"><span>Margen liquido</span><strong>'+r.detail+'</strong></div></div><div class="disclaimer">Analisis con tus datos locales. No incluye cotizaciones ni noticias en tiempo real.</div></section></div>'+
+    '<div class="dashboard-grid"><div class="hero-metrics"><section class="wealth-panel"><div class="metric-label">Patrimonio neto</div><div class="wealth-value">'+money(w)+'</div><div class="metric-delta '+(change<0?"is-down":"")+'"><strong>'+signed(change)+" ("+changeRate+')</strong><span>este mes</span></div><p class="metric-subline"><b>'+money(m.savings)+'</b> de ahorro, <b>'+money(m.invested)+'</b> aportados a cartera.</p>'+miniChart()+'</section><section class="health-panel">'+ring(h.score)+'<p class="health-caption">'+(h.score>=75?"Base financiera solida":"Hay palancas claras de mejora")+'</p></section></div>'+
+    '<div class="dashboard-two"><section class="chart-panel"><div class="panel-head"><div><h2 class="panel-title">Evolucion del patrimonio</h2><span class="panel-note">Ultimos 12 meses</span></div><select class="period-select"><option>12 meses</option></select></div>'+chart()+'</section><section class="recommendation-panel"><div class="recommendation-top"><div class="recommendation-icon"><span data-icon="sparkles"></span></div><div><div class="section-kicker">Que haria hoy</div><h2>'+r.title+'</h2></div></div><p>'+r.text+'</p><div class="recommendation-facts"><div class="fact"><span>Propuesta</span><strong>'+r.main+'</strong></div><div class="fact"><span>Margen liquido</span><strong>'+r.detail+'</strong></div></div><div class="disclaimer">Analisis con los datos financieros disponibles. No incluye cotizaciones ni noticias en tiempo real.</div></section></div>'+
     '<section class="distribution-panel"><div class="panel-head"><div><h2 class="panel-title">Distribucion del patrimonio</h2><span class="panel-note">Activos menos deudas</span></div><button class="text-button" data-view="patrimonio">Ver patrimonio</button></div><div class="distribution-content"><div class="donut-wrap"><div class="donut" style="'+vars+'"></div><div class="donut-total"><strong>'+money(w)+'</strong><span>Total</span></div></div><div class="allocation-list">'+rows+'</div></div></section>'+
     '<div class="metric-grid">'+metric("Ingresos",money(m.income),"Este mes","upload","positive")+metric("Gastos",money(m.expense),(m.expense-old.expense>=0?"+":"")+percent((m.expense-old.expense)/(old.expense||1))+" frente al mes anterior","receipt",m.expense>old.expense?"negative":"")+metric("Ahorro",money(m.savings),percent(m.rate)+" de tus ingresos","wallet",m.savings>=0?"positive":"negative")+metric("Inversion",money(m.invested),"No se contabiliza como gasto","chart","")+'</div>'+
     '<section class="panel coach-strip"><div class="coach-strip-copy"><div class="section-kicker">Coach Financiero <span class="badge badge-investment">IA local</span></div><h2>Un resumen que te ayuda a decidir</h2><p>'+r.main+". "+r.text+'</p><div class="coach-actions">'+quick+'</div></div>'+coachVisual("coach-art coach-fallback")+'</section>'+
@@ -338,15 +322,18 @@ function expenses(){
 function patrimonio(){
   const h=health(), items=allocations(), total=items.reduce(function(s,i){return s+i.value;},0);
   return '<section class="view">'+head("Balance personal","Patrimonio","Activos menos deudas. Cada registro conserva su cuenta o tipo de activo.",'<button class="btn btn-primary" data-action="account"><span data-icon="plus"></span>Anadir cuenta</button>')+
-  '<div class="breakdown-grid"><section class="breakdown-panel panel"><div class="section-kicker">Patrimonio neto</div><div class="wealth-value" style="font-size:45px">'+money(wealth())+'</div><p class="metric-subline">Liquidez disponible <b>'+money(h.liquid)+'</b>. Reserva objetivo <b>'+money(h.target)+'</b>.</p><div class="allocation-bars" style="margin-top:23px">'+items.map(function(i){return '<div class="allocation-bar"><span>'+i.name+'</span><div class="bar-track"><div class="bar-fill" style="--allocation-color:'+i.color+';width:'+(i.value/total*100)+'%"></div></div><strong>'+percent(i.value/total)+'</strong></div>';}).join("")+'</div></section><section class="breakdown-panel panel"><div class="panel-head"><div><h2 class="panel-title">Cuentas y efectivo</h2><span class="panel-note">Saldo actual registrado</span></div></div><div class="account-list">'+state.accounts.map(function(a){return '<div class="account-row"><div class="account-name"><i class="account-mark">'+safe(a.name.slice(0,1))+'</i><span>'+safe(a.name)+'<small class="account-meta">'+(a.kind==="cash"?"Efectivo":a.kind==="broker"?"Broker":"Cuenta bancaria")+'</small></span></div><strong>'+money(a.balance)+'</strong></div>';}).join("")+'</div></section></div>'+
+  '<div class="breakdown-grid"><section class="breakdown-panel panel"><div class="section-kicker">Patrimonio neto</div><div class="wealth-value" style="font-size:45px">'+money(wealth())+'</div><p class="metric-subline">Liquidez disponible <b>'+money(h.liquid)+'</b>. Reserva objetivo <b>'+money(h.target)+'</b>.</p><div class="allocation-bars" style="margin-top:23px">'+(total?items.map(function(i){return '<div class="allocation-bar"><span>'+i.name+'</span><div class="bar-track"><div class="bar-fill" style="--allocation-color:'+i.color+';width:'+(i.value/total*100)+'%"></div></div><strong>'+percent(i.value/total)+'</strong></div>';}).join(""):'<div class="table-empty">Anade cuentas, activos o inversiones para construir tu patrimonio.</div>')+'</div></section><section class="breakdown-panel panel"><div class="panel-head"><div><h2 class="panel-title">Cuentas y efectivo</h2><span class="panel-note">Saldo actual registrado</span></div></div><div class="account-list">'+(state.accounts.length?state.accounts.map(function(a){return '<div class="account-row"><div class="account-name"><i class="account-mark">'+safe(a.name.slice(0,1))+'</i><span>'+safe(a.name)+'<small class="account-meta">'+(a.kind==="cash"?"Efectivo":a.kind==="broker"?"Broker":"Cuenta bancaria")+'</small></span></div><strong>'+money(a.balance)+'</strong></div>';}).join(""):'<div class="table-empty">Todavia no hay cuentas registradas.</div>')+'</div></section></div>'+
   '<div class="content-grid" style="margin-top:18px"><section class="breakdown-panel panel"><div class="panel-head"><div><h2 class="panel-title">Activos no liquidos</h2><span class="panel-note">Valoracion manual o de mercado</span></div><button class="btn btn-small" data-view="inversiones">Ver cartera</button></div><div class="holding-list">'+state.assets.map(function(a){const p=a.value-a.cost;return '<div class="holding-row"><div class="holding-name"><span>'+safe(a.name)+'<small class="holding-meta">'+a.group+(a.ticker?" · "+a.ticker:"")+'</small></span></div><div><strong>'+money(a.value)+'</strong><span class="holding-profit '+(p<0?"negative":"")+'">'+signed(p)+'</span></div></div>';}).join("")+'</div></section><aside class="side-stack"><article class="insight-card"><div class="section-kicker">Formula</div><h3>Activos - deudas</h3><p>Actualmente hay '+money(debt())+' de deudas registradas.</p></article><article class="insight-card"><div class="section-kicker">Futuro</div><h3>Vivienda preparada</h3><p>El modelo admite inmuebles e hipotecas sin mezclar valor de vivienda con efectivo.</p></article></aside></div></section>';
 }
 function investments(){
   const list=state.assets.filter(function(a){return ["Inversiones","Criptomonedas","Oro y Metales"].includes(a.group);}), total=list.reduce(function(s,a){return s+a.value;},0);
   const groups=[{name:"Inversiones",color:"#f32d3a"},{name:"Criptomonedas",color:"#9d5ce5"},{name:"Oro y Metales",color:"#e2b450"}].map(function(g){return {name:g.name,value:group(g.name),color:g.color};}).filter(function(g){return g.value;});
+  const netWorth = wealth();
+  const investedRatio = netWorth ? total/netWorth : 0;
+  const cryptoRatio = netWorth ? group("Criptomonedas")/netWorth : 0;
   return '<section class="view">'+head("Cartera","Inversiones","Concentracion, rentabilidad y aportaciones en un solo sitio.",'<button class="btn btn-primary" data-action="movement" data-invest="true"><span data-icon="plus"></span>Registrar aportacion</button>')+
-  '<div class="breakdown-grid"><section class="breakdown-panel panel"><div class="section-kicker">Valor invertido</div><div class="portfolio-head"><div class="portfolio-total"><strong>'+money(total)+'</strong><span>'+percent(total/wealth())+' del patrimonio</span></div><span class="badge badge-investment">'+state.profile.risk+'</span></div><div class="allocation-bars">'+groups.map(function(g){return '<div class="allocation-bar"><span>'+g.name+'</span><div class="bar-track"><div class="bar-fill" style="--allocation-color:'+g.color+';width:'+(g.value/total*100)+'%"></div></div><strong>'+percent(g.value/total)+'</strong></div>';}).join("")+'</div></section><section class="breakdown-panel panel"><div class="section-kicker">Lectura de riesgo</div><h2 class="panel-title" style="margin-top:5px">'+(group("Criptomonedas")/wealth()>.15?"Cripto ya tiene peso material":"La cartera esta razonablemente repartida")+'</h2><p class="panel-note" style="margin:9px 0 0">'+(group("Criptomonedas")/wealth()>.15?"Antes de aumentar cripto, priorizaria nuevas aportaciones a la parte diversificada.":"La siguiente aportacion puede reforzar la diversificacion sin comprometer la reserva.")+'</p><button class="btn btn-small" style="margin-top:18px" data-action="ask" data-q="inversion">Analizar cartera</button></section></div>'+
-  '<section class="table-shell" style="margin-top:18px"><div class="table-toolbar"><div><h2 class="panel-title">Posiciones</h2><span class="panel-note">Valor actual frente al coste registrado</span></div></div><table class="data-table"><thead><tr><th>Activo</th><th>Tipo</th><th>Valor actual</th><th class="align-right">Rentabilidad</th></tr></thead><tbody>'+list.map(function(a){const p=a.value-a.cost;return '<tr><td><strong>'+safe(a.name)+'</strong><br><span class="panel-note">'+(a.ticker||"Sin ticker")+'</span></td><td><span class="badge badge-investment">'+a.type+'</span></td><td><strong>'+money(a.value)+'</strong></td><td class="align-right '+(p>=0?"amount-positive":"amount-negative")+'">'+signed(p)+'<br><span class="panel-note">'+percent(p/a.cost)+'</span></td></tr>';}).join("")+'</tbody></table></section><p class="disclaimer">Las valoraciones son datos registrados por el usuario. Esta version no consulta mercado en tiempo real ni ofrece garantias.</p></section>';
+  '<div class="breakdown-grid"><section class="breakdown-panel panel"><div class="section-kicker">Valor invertido</div><div class="portfolio-head"><div class="portfolio-total"><strong>'+money(total)+'</strong><span>'+percent(investedRatio)+' del patrimonio</span></div><span class="badge badge-investment">'+state.profile.risk+'</span></div><div class="allocation-bars">'+(total?groups.map(function(g){return '<div class="allocation-bar"><span>'+g.name+'</span><div class="bar-track"><div class="bar-fill" style="--allocation-color:'+g.color+';width:'+(g.value/total*100)+'%"></div></div><strong>'+percent(g.value/total)+'</strong></div>';}).join(""):'<div class="table-empty">Todavia no hay inversiones registradas.</div>')+'</div></section><section class="breakdown-panel panel"><div class="section-kicker">Lectura de riesgo</div><h2 class="panel-title" style="margin-top:5px">'+(cryptoRatio>.15?"Cripto ya tiene peso material":"La cartera esta razonablemente repartida")+'</h2><p class="panel-note" style="margin:9px 0 0">'+(cryptoRatio>.15?"Antes de aumentar cripto, priorizaria nuevas aportaciones a la parte diversificada.":"La siguiente aportacion puede reforzar la diversificacion sin comprometer la reserva.")+'</p><button class="btn btn-small" style="margin-top:18px" data-action="ask" data-q="inversion">Analizar cartera</button></section></div>'+
+  '<section class="table-shell" style="margin-top:18px"><div class="table-toolbar"><div><h2 class="panel-title">Posiciones</h2><span class="panel-note">Valor actual frente al coste registrado</span></div></div>'+(list.length?'<table class="data-table"><thead><tr><th>Activo</th><th>Tipo</th><th>Valor actual</th><th class="align-right">Rentabilidad</th></tr></thead><tbody>'+list.map(function(a){const p=a.value-a.cost, rate=a.cost?percent(p/a.cost):"Sin coste";return '<tr><td><strong>'+safe(a.name)+'</strong><br><span class="panel-note">'+(a.ticker||"Sin ticker")+'</span></td><td><span class="badge badge-investment">'+a.type+'</span></td><td><strong>'+money(a.value)+'</strong></td><td class="align-right '+(p>=0?"amount-positive":"amount-negative")+'">'+signed(p)+'<br><span class="panel-note">'+rate+'</span></td></tr>';}).join("")+'</tbody></table>':'<div class="table-empty">Anade inversiones para analizar la cartera.</div>')+'</section><p class="disclaimer">Las valoraciones son datos registrados por el usuario. Esta version no consulta mercado en tiempo real ni ofrece garantias.</p></section>';
 }
 function goals(){
   return '<section class="view">'+head("Plan financiero","Objetivos","Convierte el ahorro en prioridades concretas y medibles.",'<button class="btn btn-primary" data-action="goal"><span data-icon="plus"></span>Crear objetivo</button>')+
@@ -386,6 +373,7 @@ function imports(){
 }
 
 function render(){
+  publishState();
   const map={inicio:dashboard,movimientos:movements,gastos:expenses,patrimonio:patrimonio,inversiones:investments,objetivos:goals,coach:coach,importar:imports,salud:healthView};
   document.getElementById("app-view").innerHTML=(map[currentView]||dashboard)(); hydrate(document.getElementById("app-view")); nav(); topbar(); dropZone(); renderVersion();
 }
@@ -401,9 +389,15 @@ function go(view){ currentView=view; document.querySelector(".app-shell").classL
 function modal(content,wide){const root=document.getElementById("modal-root");root.innerHTML='<div class="modal-backdrop" data-action="close-modal"><section class="modal '+(wide?"modal-wide":"")+'" role="dialog" aria-modal="true" data-modal-content="true">'+content+'</section></div>';hydrate(root);const f=root.querySelector("input,select,textarea,button");if(f)f.focus();}
 function close(){document.getElementById("modal-root").innerHTML="";}
 function toast(text,error){const r=document.getElementById("toast-root"),n=document.createElement("div");n.className="toast"+(error?" error":"");n.innerHTML='<span data-icon="'+(error?"alert":"check")+'"></span><span>'+safe(text)+'</span>';r.appendChild(n);hydrate(n);setTimeout(function(){n.remove();},3600);}
-function movementModal(invest){
+function movementModal(invest,id){
+  const existing=state.transactions.find(function(t){return t.id===id;});
+  if(!state.accounts.length){
+    modal('<header class="modal-head"><div><div class="section-kicker">Cuenta requerida</div><h2>Primero anade una cuenta</h2><p>Los movimientos necesitan una cuenta origen para guardar saldos y patrimonio correctamente.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><div class="modal-body"><div class="source-warning"><strong>No hay cuentas registradas</strong>Crea tu cuenta corriente, cuenta de ahorro o efectivo antes de registrar movimientos.</div></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button type="button" class="btn btn-primary" data-action="account">Anadir cuenta</button></footer>');
+    return;
+  }
   const accounts=state.accounts.map(function(a){return '<option value="'+a.id+'">'+safe(a.name)+'</option>';}).join(""), cats=CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join("");
-  modal('<header class="modal-head"><div><div class="section-kicker">Registro manual</div><h2>Nuevo movimiento</h2><p>Ingresos, gastos, inversiones y transferencias se tratan de forma distinta.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="movement-form"><div class="modal-body"><div class="form-grid"><div class="form-field full"><label>Concepto</label><input name="merchant" required placeholder="Ej. MERCADONA o Nomina"></div><div class="form-field"><label>Tipo</label><select name="type"><option value="income">Ingreso</option><option value="expense">Gasto</option><option value="investment_buy"'+(invest?" selected":"")+'>Aportacion a inversion</option><option value="investment_sell">Venta de inversion</option><option value="transfer">Transferencia</option></select></div><div class="form-field"><label>Importe</label><input name="amount" type="number" min=".01" step=".01" required></div><div class="form-field"><label>Fecha</label><input name="date" type="date" value="'+iso(new Date())+'" required></div><div class="form-field"><label>Cuenta origen</label><select name="accountId">'+accounts+'</select></div><div class="form-field"><label>Cuenta destino</label><select name="destinationAccountId"><option value="">Sin destino</option>'+accounts+'</select></div><div class="form-field"><label>Categoria</label><select name="category">'+cats+'</select></div><div class="form-field full"><label>Nota opcional</label><textarea name="description"></textarea></div></div><p class="form-hint">Una transferencia mueve dinero entre cuentas: no cuenta como ingreso ni gasto real.</p></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar movimiento</button></footer></form>');
+  function selected(value,current){return value===current?" selected":"";}
+  modal('<header class="modal-head"><div><div class="section-kicker">Registro manual</div><h2>'+(existing?"Editar movimiento":"Nuevo movimiento")+'</h2><p>Ingresos, gastos, inversiones y transferencias se tratan de forma distinta.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="movement-form" data-id="'+(existing?existing.id:"")+'"><div class="modal-body"><div class="form-grid"><div class="form-field full"><label>Concepto</label><input name="merchant" required placeholder="Ej. MERCADONA o Nomina" value="'+safe(existing?existing.merchant:"")+'"></div><div class="form-field"><label>Tipo</label><select name="type"><option value="income"'+selected("income",existing?existing.type:"")+'>Ingreso</option><option value="expense"'+selected("expense",existing?existing.type:"")+'>Gasto</option><option value="investment_buy"'+(invest||existing&&existing.type==="investment_buy"?" selected":"")+'>Aportacion a inversion</option><option value="investment_sell"'+selected("investment_sell",existing?existing.type:"")+'>Venta de inversion</option><option value="transfer"'+selected("transfer",existing?existing.type:"")+'>Transferencia</option></select></div><div class="form-field"><label>Importe</label><input name="amount" type="number" min=".01" step=".01" required value="'+(existing?Math.abs(existing.amount):"")+'"></div><div class="form-field"><label>Fecha</label><input name="date" type="date" value="'+(existing?existing.date:iso(new Date()))+'" required></div><div class="form-field"><label>Cuenta origen</label><select name="accountId">'+state.accounts.map(function(a){return '<option value="'+a.id+'"'+selected(a.id,existing?existing.accountId:"")+'>'+safe(a.name)+'</option>';}).join("")+'</select></div><div class="form-field"><label>Cuenta destino</label><select name="destinationAccountId"><option value="">Sin destino</option>'+state.accounts.map(function(a){return '<option value="'+a.id+'"'+selected(a.id,existing?existing.destinationAccountId:"")+'>'+safe(a.name)+'</option>';}).join("")+'</select></div><div class="form-field"><label>Categoria</label><select name="category">'+CATEGORIES.map(function(c){return '<option value="'+c+'"'+selected(c,existing?existing.category:"")+'>'+c+'</option>';}).join("")+'</select></div><div class="form-field full"><label>Nota opcional</label><textarea name="description">'+safe(existing?existing.description:"")+'</textarea></div></div><p class="form-hint">Una transferencia mueve dinero entre cuentas: no cuenta como ingreso ni gasto real.</p></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar movimiento</button></footer></form>');
 }
 function goalModal(id){
   const g=state.goals.find(function(x){return x.id===id;});
@@ -412,10 +406,10 @@ function goalModal(id){
 function accountModal(){modal('<header class="modal-head"><div><div class="section-kicker">Patrimonio</div><h2>Anadir cuenta o efectivo</h2><p>El saldo entra en la parte liquida del patrimonio.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="account-form"><div class="modal-body"><div class="form-grid"><div class="form-field"><label>Nombre</label><input name="name" required></div><div class="form-field"><label>Tipo</label><select name="kind"><option value="bank">Cuenta bancaria</option><option value="cash">Efectivo</option><option value="broker">Broker</option></select></div><div class="form-field full"><label>Saldo actual</label><input name="balance" type="number" min="0" step=".01" required></div></div></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Anadir cuenta</button></footer></form>');}
 function settings(){
   const status=api.backendStatus(),migration=api.migrationStatus();
-  modal('<header class="modal-head"><div><div class="section-kicker">Configuracion</div><h2>Preferencias financieras</h2><p>Estas reglas alimentan la lectura local del Coach.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="settings-form"><div class="modal-body"><div class="form-grid"><div class="form-field"><label>Tu nombre</label><input name="name" required value="'+safe(state.profile.name)+'"></div><div class="form-field"><label>Perfil de riesgo</label><select name="risk"><option'+(state.profile.risk==="Conservador"?" selected":"")+'>Conservador</option><option'+(state.profile.risk==="Moderado"?" selected":"")+'>Moderado</option><option'+(state.profile.risk==="Dinamico"?" selected":"")+'>Dinamico</option></select></div><div class="form-field"><label>Meses de emergencia</label><input name="emergency" type="number" min="1" max="12" required value="'+state.profile.emergency+'"></div><div class="form-field"><label>Aportacion mensual</label><input name="contribution" type="number" min="0" step="10" required value="'+state.profile.contribution+'"></div></div><section class="settings-backend"><div><strong>Persistencia</strong><span>'+(status.connected?"Supabase conectado":"Modo local con fallback seguro")+'</span>'+(migration?'<small>Ultima migracion: '+(migration.ok?"correcta":"pendiente")+'</small>':"")+'</div><button class="btn btn-small" type="button" data-action="migrate-local"><span data-icon="upload"></span>Migrar localStorage</button></section><button class="btn btn-small btn-danger" style="margin-top:20px" type="button" data-action="reset"><span data-icon="refresh"></span>Restablecer datos de ejemplo</button></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar cambios</button></footer></form>');
+  modal('<header class="modal-head"><div><div class="section-kicker">Configuracion</div><h2>Preferencias financieras</h2><p>Estas reglas alimentan el contexto financiero del Coach.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><form id="settings-form"><div class="modal-body"><div class="form-grid"><div class="form-field"><label>Tu nombre</label><input name="name" required value="'+safe(state.profile.name)+'"></div><div class="form-field"><label>Perfil de riesgo</label><select name="risk"><option'+(state.profile.risk==="Conservador"?" selected":"")+'>Conservador</option><option'+(state.profile.risk==="Moderado"?" selected":"")+'>Moderado</option><option'+(state.profile.risk==="Dinamico"?" selected":"")+'>Dinamico</option></select></div><div class="form-field"><label>Meses de emergencia</label><input name="emergency" type="number" min="1" max="12" required value="'+state.profile.emergency+'"></div><div class="form-field"><label>Aportacion mensual</label><input name="contribution" type="number" min="0" step="10" required value="'+state.profile.contribution+'"></div></div><section class="settings-backend"><div><strong>Persistencia</strong><span>'+(status.connected?"API conectada a Supabase":"Backend no disponible; guardado desactivado")+'</span>'+(migration?'<small>Ultima migracion: '+(migration.ok?"correcta":"pendiente")+'</small>':"")+'</div><button class="btn btn-small" type="button" data-action="migrate-local"><span data-icon="upload"></span>Migrar localStorage</button></section><button class="btn btn-small btn-danger" style="margin-top:20px" type="button" data-action="reset"><span data-icon="refresh"></span>Restablecer datos financieros</button></div><footer class="modal-foot"><button type="button" class="btn" data-action="close-modal">Cancelar</button><button class="btn btn-primary">Guardar cambios</button></footer></form>');
 }
 function alertsModal(){const list=alertList();modal('<header class="modal-head"><div><div class="section-kicker">Alertas inteligentes</div><h2>Solo lo que requiere atencion</h2><p>Cada aviso esta vinculado a tus datos.</p></div><button class="icon-button modal-close" data-action="close-modal"><span data-icon="close"></span></button></header><div class="modal-body"><div class="insight-list">'+list.map(function(a){return '<div class="health-row"><i class="status-dot '+(a.level==="good"?"":a.level)+'"></i><span>'+a.title+'</span><strong>'+ (a.level==="good"?"Estable":"Revisar") +'</strong><small>'+a.text+'</small></div>';}).join("")+'</div></div><footer class="modal-foot"><button class="btn btn-primary" data-action="close-modal">Entendido</button></footer>');}
-function parseCsv(text,file){ return parseCsvText(text,file,state.accounts[0].id); }
+function parseCsv(text,file){ if(!state.accounts.length) throw new Error("Crea una cuenta antes de importar movimientos."); return parseCsvText(text,file,state.accounts[0].id); }
 async function upload(files){
   const list=Array.from(files||[]),csvs=list.filter(function(f){return f.name.toLowerCase().endsWith(".csv")||f.type==="text/csv";}),other=list.filter(function(f){return !csvs.includes(f);});
   if(csvs.length){try{let candidates=[];for(const f of csvs)candidates=candidates.concat(parseCsv(await f.text(),f.name));if(!candidates.length)throw new Error("No he encontrado importes validos.");stagedImport={id:uid("import"),fileName:csvs.map(function(f){return f.name;}).join(", "),createdAt:iso(new Date()),candidates:candidates};review();return;}catch(e){toast(e.message||"No se pudo analizar el CSV.",true);}}
@@ -433,9 +427,15 @@ function effect(t,sign){
 }
 function storeMovement(form){
   const d=new FormData(form),type=d.get("type"),raw=Math.abs(parseNumber(d.get("amount")));if(!Number.isFinite(raw)||raw<=0){toast("Introduce un importe valido.",true);return;}
+  if(!d.get("merchant").trim()){toast("Introduce un concepto.",true);return;}
+  if(!d.get("date")||Number.isNaN(new Date(d.get("date")+"T12:00:00").getTime())){toast("Introduce una fecha valida.",true);return;}
+  if(!account(d.get("accountId"))){toast("Selecciona una cuenta valida.",true);return;}
   if(type==="transfer"&&(!d.get("destinationAccountId")||d.get("destinationAccountId")===d.get("accountId"))){toast("Selecciona una cuenta destino distinta para la transferencia.",true);return;}
   const t={id:uid("t"),date:d.get("date"),merchant:d.get("merchant").trim(),description:d.get("description").trim(),amount:(type==="expense"||type==="investment_buy"||type==="transfer")?-raw:raw,type:type,category:type==="income"?"Ingresos":type==="transfer"?"Transferencias":type.startsWith("investment")?"Inversiones":d.get("category"),accountId:d.get("accountId"),destinationAccountId:d.get("destinationAccountId")};
-  state.transactions.push(t);effect(t,1);snapshot();save();close();render();toast("Movimiento guardado y recalculado.");
+  const old=state.transactions.find(function(x){return x.id===form.dataset.id;});
+  if(old){effect(old,-1);Object.assign(old,t,{id:old.id});effect(old,1);}
+  else{state.transactions.push(t);effect(t,1);}
+  snapshot();save();close();render();toast("Movimiento guardado y recalculado.");
 }
 function confirmImport(){
   if(!stagedImport)return;const ids=[];stagedImport.candidates.forEach(function(c){const t=Object.assign({},c,{id:uid("t"),importId:stagedImport.id});if(t.type==="expense"&&t.amount>0)t.amount*=-1;state.transactions.push(t);effect(t,1);ids.push(t.id);});state.imports.push({id:stagedImport.id,fileName:stagedImport.fileName,createdAt:stagedImport.createdAt,count:ids.length,ids:ids});snapshot();save();const count=ids.length;stagedImport=null;close();go("movimientos");toast(count+" movimientos importados correctamente.");
@@ -452,6 +452,7 @@ document.addEventListener("click",function(e){
   if(action==="close-modal"){if(!e.target.closest("[data-modal-content]")||b===e.target)close();}
   else if(action==="toggle-menu")document.querySelector(".app-shell").classList.toggle("menu-open");
   else if(action==="movement")movementModal(b.dataset.invest==="true");
+  else if(action==="edit-movement")movementModal(false,b.dataset.id);
   else if(action==="goal")goalModal(b.dataset.id);
   else if(action==="account")accountModal();
   else if(action==="open-settings")settings();
@@ -462,7 +463,7 @@ document.addEventListener("click",function(e){
   else if(action==="ask")ask(b.dataset.q);
   else if(action==="delete"){const t=state.transactions.find(function(x){return x.id===b.dataset.id;});if(t&&confirm("¿Eliminar este movimiento?")){effect(t,-1);state.transactions=state.transactions.filter(function(x){return x!==t;});snapshot();save();render();toast("Movimiento eliminado.");}}
   else if(action==="undo")undo(b.dataset.id);
-  else if(action==="reset"){if(confirm("¿Restablecer todos los datos locales de ejemplo?"))resetState();}
+  else if(action==="reset"){if(confirm("¿Restablecer todos los datos financieros? Esta accion vacia tus registros en el backend."))resetState();}
 });
 document.addEventListener("change",function(e){
   if(e.target.id==="file-input"){upload(e.target.files);e.target.value="";}

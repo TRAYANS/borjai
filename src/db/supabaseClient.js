@@ -45,7 +45,7 @@ function createQuery(baseUrl, anonKey, token, table) {
         in(column, values) {
           const list = Array.isArray(values) ? values.filter((value) => value != null).map(String) : [];
           if (!list.length) return chain;
-          state.filters.push([column, `in.(${list.map((value) => `\"${value.replaceAll('\\"', '\\\\"')}\"`).join(",")})`]);
+          state.filters.push([column, `in.(${list.map((value) => value.replaceAll('\\"', '\\\\"')).join(",")})`]);
           return chain;
         },
         order(column = "created_at", options = {}) {
@@ -91,7 +91,7 @@ function createQuery(baseUrl, anonKey, token, table) {
         },
         in(column, values) {
           const list = Array.isArray(values) ? values.filter((value) => value != null).map(String) : [];
-          if (list.length) state.filters.push([column, `in.(${list.map((value) => `\"${value.replaceAll('\\"', '\\\\"')}\"`).join(",")})`]);
+          if (list.length) state.filters.push([column, `in.(${list.map((value) => value.replaceAll('\\"', '\\\\"')).join(",")})`]);
           return chain;
         },
         then(resolve, reject) {
