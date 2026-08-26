@@ -87,7 +87,7 @@ Rules:
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "qwen/qwen3.6-27b",
+        model: process.env.GROQ_VISION_MODEL || "qwen/qwen3.6-27b",
         temperature: 0,
         reasoning_effort: "none",
         reasoning_format: "hidden",
