@@ -107,15 +107,14 @@ function renderPersistentChat() {
   const messagesNode = document.getElementById("messages");
   if (!messagesNode) return;
   const messages = loadMessages();
+  messagesNode.innerHTML = "";
   if (!messages.length) {
-    messagesNode.innerHTML = "";
     messagesNode.appendChild(messageNode({
       role: "assistant",
       text: "Hola, Borja 👋 Soy tu asistente financiero. Puedo ayudarte con inversiones, ahorro, gastos, patrimonio y objetivos. Pregúntame lo que quieras."
     }));
     return;
   }
-  messagesNode.innerHTML = "";
   messages.forEach((message) => messagesNode.appendChild(messageNode(message)));
   messagesNode.scrollTop = messagesNode.scrollHeight;
 }
@@ -173,6 +172,8 @@ function enhanceCoach() {
   if (!coachView) return;
   document.getElementById("ai-council-banner")?.remove();
   document.querySelector(".coach-context")?.remove();
+  if (coachView.dataset.coachV18Enhanced === "1") return;
+  coachView.dataset.coachV18Enhanced = "1";
   coachView.classList.add("coach-v18");
   renderPersistentChat();
 }
