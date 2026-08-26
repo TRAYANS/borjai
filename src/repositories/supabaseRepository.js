@@ -112,6 +112,12 @@ export function createSupabaseRepository(client, fallbackFactory) {
       return result.data?.session?.access_token || "";
     },
 
+    async loadSnapshots() {
+      const user = await requireUser(client);
+      const rows = await selectAll(client, "wealth_snapshots", user.id);
+      return fromDatabaseRows({ wealth_snapshots: rows }, fallbackFactory).snapshots;
+    },
+
     async load() {
       const user = await requireUser(client);
       const rows = {};
