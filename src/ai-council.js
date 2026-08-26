@@ -1,4 +1,5 @@
 const STORAGE_KEY = "borjai:mvp:v1";
+const SESSION_KEY = "borjai:supabase:session:v1";
 const AUTH_KEY_HINT = "sb-";
 
 function readState() {
@@ -9,6 +10,11 @@ function readState() {
 }
 
 function readAccessToken() {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    if (session?.access_token) return session.access_token;
+  } catch (_) {}
+  if (window.BORJAI_SESSION_TOKEN) return window.BORJAI_SESSION_TOKEN;
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i) || "";
     if (!key.startsWith(AUTH_KEY_HINT) || !key.endsWith("-auth-token")) continue;
