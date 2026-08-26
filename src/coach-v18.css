@@ -1,0 +1,80 @@
+.coach-view.coach-v18 {
+  display: block;
+  width: 100%;
+}
+
+.coach-view.coach-v18 .chat-panel {
+  width: 100%;
+  min-height: min(720px, calc(100vh - 245px));
+  max-width: none;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.coach-view.coach-v18 .chat-messages {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 28px clamp(18px, 4vw, 46px);
+  overflow-y: auto;
+}
+
+.coach-view.coach-v18 .chat-message {
+  max-width: min(88%, 820px);
+}
+
+.coach-view.coach-v18 .chat-bubble {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.coach-view.coach-v18 .chat-suggestions,
+.coach-view.coach-v18 .chat-input-row {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.coach-view.coach-v18 .chat-suggestions {
+  padding: 0 clamp(18px, 4vw, 46px) 15px;
+}
+
+.coach-view.coach-v18 .chat-input-row {
+  padding: 15px clamp(18px, 4vw, 46px) 20px;
+}
+
+.coach-view.coach-v18 .chat-input-row input {
+  min-height: 48px;
+  font-size: 14px;
+}
+
+.coach-view.coach-v18 .chat-send {
+  width: 48px;
+  min-width: 48px;
+}
+
+.coach-view.coach-v18 .chat-message.user .chat-bubble {
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  .coach-view.coach-v18 .chat-panel {
+    min-height: calc(100vh - 210px);
+  }
+  .coach-view.coach-v18 .chat-messages {
+    padding: 20px 13px;
+  }
+  .coach-view.coach-v18 .chat-message {
+    max-width: 94%;
+  }
+  .coach-view.coach-v18 .chat-suggestions {
+    padding: 0 13px 12px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .coach-view.coach-v18 .quick-chip {
+    white-space: nowrap;
+  }
+  .coach-view.coach-v18 .chat-input-row {
+    padding: 12px 13px 14px;
+  }
+}
