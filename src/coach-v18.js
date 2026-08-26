@@ -107,7 +107,14 @@ function renderPersistentChat() {
   const messagesNode = document.getElementById("messages");
   if (!messagesNode) return;
   const messages = loadMessages();
-  if (!messages.length) return;
+  if (!messages.length) {
+    messagesNode.innerHTML = "";
+    messagesNode.appendChild(messageNode({
+      role: "assistant",
+      text: "Hola, Borja 👋 Soy tu asistente financiero. Puedo ayudarte con inversiones, ahorro, gastos, patrimonio y objetivos. Pregúntame lo que quieras."
+    }));
+    return;
+  }
   messagesNode.innerHTML = "";
   messages.forEach((message) => messagesNode.appendChild(messageNode(message)));
   messagesNode.scrollTop = messagesNode.scrollHeight;
@@ -137,6 +144,11 @@ async function submitQuestion(question) {
   const value = String(question || "").trim();
   if (!value) return;
   addMessage("user", value);
+  const greeting = /^(hola|holaa+|buenas|buenos días|buenas tardes|buenas noches|hey|hello)\s*[!.?]*$/i.test(value);
+  if (greeting) {
+    addMessage("assistant", "¡Hola, Borja! 👋 Estoy listo. Dime qué quieres mejorar: inversiones, ahorro, gastos, patrimonio u objetivos.");
+    return;
+  }
   setLoading(true);
   const messagesNode = document.getElementById("messages");
   const loading = messageNode({ role: "assistant", loading: true });
