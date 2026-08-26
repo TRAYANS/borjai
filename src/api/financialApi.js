@@ -11,6 +11,9 @@ function statusMode(repository) {
   if (repository.kind === "supabase") return "supabase";
   return "local";
 }
+function isRemoteRepository(repository) {
+  return repository && (repository.kind === "server-api" || repository.kind === "supabase");
+}
 function wealthFromState(state) {
   const accounts = (state.accounts || []).reduce((sum, a) => sum + Number(a.balance || 0), 0);
   const assets = (state.assets || []).reduce((sum, a) => sum + Number(a.value || 0), 0);
@@ -120,7 +123,7 @@ export async function createFinancialApi(options) {
   }
 
   async function loadFromBackend() {
-    const repo = activeRepository.kind === "supabase" ? activeRepository : await connectBackend();
+    const repo = isRemoteRepository(activeRepository) ? activeRepository : await connectBackend();
     return repo.load();
   }
 
@@ -166,8 +169,7 @@ export async function createFinancialApi(options) {
         activeRepository = localRepository;
         return localRepository.load();
       }
-      const local = localRepository.readRaw();
-      return validateLegacyState(local).ok ? normalizeState(local, fallbackFactory) : fallbackFactory();
+      return fallbackFactory();
     }
   }
 
@@ -177,7 +179,7 @@ export async function createFinancialApi(options) {
     normalized = ensured.state;
 
     try {
-      if (activeRepository.kind !== "supabase") await connectBackend();
+      if (!isRemoteRepository(activeRepository)) await connectBackend();
       if (typeof activeRepository.loadSnapshots === "function") {
         const remoteSnapshots = await activeRepository.loadSnapshots();
         normalized.snapshots = mergeSnapshots(remoteSnapshots, normalized.snapshots);
@@ -203,7 +205,7 @@ export async function createFinancialApi(options) {
 
   async function reset() {
     try {
-      if (activeRepository.kind !== "supabase") await connectBackend();
+      if (!isRemoteRepository(activeRepository)) await connectBackend();
       const next = await activeRepository.reset();
       await localRepository.saveState(next);
       backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
@@ -225,7 +227,7 @@ export async function createFinancialApi(options) {
     if (!validation.ok) return { ok: false, errors: validation.errors };
     localRepository.backup(LOCAL_BACKUP_KEY);
     try {
-      if (activeRepository.kind !== "supabase") await connectBackend();
+      if (!isRemoteRepository(activeRepository)) await connectBackend();
       const result = await activeRepository.migrateFromLocal(localState);
       backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
       const status = Object.assign({ createdAt: new Date().toISOString() }, result);

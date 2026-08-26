@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import {
   fromDatabaseRows,
   normalizeState,
@@ -30,6 +29,112 @@ const CONFLICT_KEYS = {
   imports: "user_id,legacy_id",
   wealth_snapshots: "user_id,legacy_id"
 };
+
+function queryError(data, status) {
+  return new Error(data?.message || data?.error_description || data?.hint || data?.details || `Supabase ${status}`);
+}
+
+function quoteIn(values) {
+  return `in.(${(values || []).filter((value) => value != null).map((value) => String(value).replaceAll('"', '\\"')).join(",")})`;
+}
+
+function createRestClient(baseUrl, apiKey, bearerToken) {
+  const root = String(baseUrl || "").replace(/\/$/, "");
+  const headers = {
+    apikey: apiKey,
+    Authorization: `Bearer ${bearerToken || apiKey}`,
+    Accept: "application/json"
+  };
+
+  return {
+    from(table) {
+      return {
+        select(columns = "*") {
+          const state = { columns, filters: [], order: "" };
+          const chain = {
+            eq(column, value) {
+              state.filters.push([column, `eq.${value}`]);
+              return chain;
+            },
+            in(column, values) {
+              if (Array.isArray(values) && values.length) state.filters.push([column, quoteIn(values)]);
+              return chain;
+            },
+            order(column = "created_at", options = {}) {
+              state.order = `${column}.${options.ascending === false ? "desc" : "asc"}`;
+              const url = new URL(`/rest/v1/${table}`, root);
+              url.searchParams.set("select", state.columns);
+              state.filters.forEach(([key, value]) => url.searchParams.set(key, value));
+              if (state.order) url.searchParams.set("order", state.order);
+              return fetch(url, { headers, cache: "no-store" }).then(async (response) => {
+                const data = await response.json().catch(() => []);
+                if (!response.ok) return { data: null, error: queryError(data, response.status) };
+                return { data: Array.isArray(data) ? data : [], error: null };
+              });
+            }
+          };
+          return chain;
+        },
+        upsert(rows, options = {}) {
+          const url = new URL(`/rest/v1/${table}`, root);
+          if (options.onConflict) url.searchParams.set("on_conflict", options.onConflict);
+          return fetch(url, {
+            method: "POST",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            },
+            body: JSON.stringify(rows || []),
+            cache: "no-store"
+          }).then(async (response) => {
+            const data = await response.json().catch(() => null);
+            if (!response.ok) return { data: null, error: queryError(data, response.status) };
+            return { data, error: null };
+          });
+        },
+        delete() {
+          const state = { filters: [] };
+          const chain = {
+            eq(column, value) {
+              state.filters.push([column, `eq.${value}`]);
+              return chain;
+            },
+            in(column, values) {
+              if (Array.isArray(values) && values.length) state.filters.push([column, quoteIn(values)]);
+              return chain;
+            },
+            then(resolve, reject) {
+              const url = new URL(`/rest/v1/${table}`, root);
+              state.filters.forEach(([key, value]) => url.searchParams.set(key, value));
+              return fetch(url, {
+                method: "DELETE",
+                headers: { ...headers, Prefer: "return=minimal" },
+                cache: "no-store"
+              }).then(async (response) => {
+                const data = await response.json().catch(() => null);
+                if (!response.ok) return { data: null, error: queryError(data, response.status) };
+                return { data, error: null };
+              }).then(resolve, reject);
+            }
+          };
+          return chain;
+        }
+      };
+    },
+    auth: {
+      async getUser(token) {
+        const response = await fetch(`${root}/auth/v1/user`, {
+          headers: { apikey: apiKey, Authorization: `Bearer ${token}` },
+          cache: "no-store"
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return { data: { user: null }, error: queryError(data, response.status) };
+        return { data: { user: data }, error: null };
+      }
+    }
+  };
+}
 
 export function emptyState() {
   return {
@@ -79,9 +184,7 @@ export function createConfiguredClient(req) {
   const ownerId = process.env.BORJAI_OWNER_ID || "";
   if (serviceKey && ownerId) {
     return {
-      client: createClient(url, serviceKey, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-      }),
+      client: createRestClient(url, serviceKey, serviceKey),
       userId: ownerId,
       mode: "service_role_owner"
     };
@@ -90,10 +193,7 @@ export function createConfiguredClient(req) {
   const token = getBearer(req);
   if (!token) throw new Error("Sesión de BorjaAI no disponible.");
   return {
-    client: createClient(url, anonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-    }),
+    client: createRestClient(url, anonKey, token),
     token,
     mode: "rls_user"
   };
@@ -130,7 +230,7 @@ function rowKey(table, row) {
 async function deleteStaleRows(context, table, desiredRows) {
   const userId = await resolveUser(context);
   const select = table === "categories" ? "id,name,type" : "id,legacy_id";
-  const result = await context.client.from(table).select(select).eq("user_id", userId);
+  const result = await context.client.from(table).select(select).eq("user_id", userId).order("created_at", { ascending: true });
   if (result.error) throw new Error(`Error preparando limpieza de ${table}: ${result.error.message}`);
 
   const desired = new Set((desiredRows || []).map((row) => rowKey(table, row)));
@@ -150,12 +250,17 @@ export async function replaceState(context, state) {
   const rows = toDatabaseRows(normalized, userId);
   for (const table of TABLES) {
     const desiredRows = rows[table] || [];
-    await deleteStaleRows(context, table, desiredRows);
     if (!desiredRows.length) continue;
     const result = await context.client.from(table).upsert(desiredRows, {
       onConflict: CONFLICT_KEYS[table]
     });
     if (result.error) throw new Error(`Error guardando ${table}: ${result.error.message}`);
+    await deleteStaleRows(context, table, desiredRows);
+  }
+  for (const table of TABLES) {
+    const desiredRows = rows[table] || [];
+    if (desiredRows.length) continue;
+    await deleteStaleRows(context, table, desiredRows);
   }
   return normalized;
 }

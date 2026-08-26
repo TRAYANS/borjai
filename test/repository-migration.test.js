@@ -45,6 +45,36 @@ test("el repositorio local conserva compatibilidad con borjai:mvp:v1", async fun
   assert.equal(api.backendStatus().mode, "local");
 });
 
+test("financialApi no usa localStorage como fallback silencioso en modo api", async function() {
+  const storage = memoryStorage();
+  storage.setItem("borjai:mvp:v1", JSON.stringify(sampleState()));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async function() {
+    return {
+      ok: false,
+      status: 503,
+      async json() { return { ok: false, error: "Backend no disponible." }; }
+    };
+  };
+
+  try {
+    const api = await createFinancialApi({
+      localKey: "borjai:mvp:v1",
+      fallbackFactory: function() {
+        return { version: 1, profile: {}, accounts: [], assets: [], debts: [], transactions: [], goals: [], imports: [], snapshots: [] };
+      },
+      storage: storage,
+      config: { backendMode: "api", supabaseUrl: "https://example.supabase.co", supabaseAnonKey: "anon" }
+    });
+    const loaded = await api.load();
+    assert.equal(api.backendStatus().mode, "unavailable");
+    assert.equal(loaded.transactions.length, 0);
+    assert.equal(loaded.accounts.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("valida el estado legacy antes de migrar", function() {
   const result = validateLegacyState({ version: 1, accounts: [], assets: [], debts: [], goals: [], transactions: [{ id: "bad", amount: "x" }] });
   assert.equal(result.ok, false);

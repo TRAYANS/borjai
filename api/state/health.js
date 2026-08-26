@@ -7,8 +7,27 @@ export default async function handler(req, res) {
     const context = createConfiguredClient(req);
     const rows = await loadRows(context);
     const counts = Object.fromEntries(TABLES.map((table) => [table, (rows[table] || []).length]));
-    return res.status(200).json({ ok: true, mode: context.mode, counts });
+    return res.status(200).json({
+      ok: true,
+      mode: context.mode,
+      supabase: {
+        configured: true,
+        reachable: true,
+        tables: TABLES.length
+      },
+      counts
+    });
   } catch (error) {
-    return res.status(200).json({ ok: false, error: error?.message || "Backend no disponible." });
+    const message = error?.message || "Backend no disponible.";
+    const status = /no está configurado|Sesión/.test(message) ? 503 : 500;
+    return res.status(status).json({
+      ok: false,
+      mode: "unavailable",
+      supabase: {
+        configured: !/no está configurado/.test(message),
+        reachable: false
+      },
+      error: message
+    });
   }
 }

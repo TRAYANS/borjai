@@ -155,7 +155,16 @@ function alertList(){
   if(cryptoRatio>.15) out.push({level:"warn",title:"Exposicion a cripto relevante",text:"Criptomonedas representa "+percent(cryptoRatio)+" del patrimonio."});
   return out.length?out:[{level:"good",title:"Situacion estable",text:"No hay alertas relevantes que requieran accion hoy."}];
 }
-function snapshot(){ const key=nowMonth(), existing=state.snapshots.find(function(s){return s.month===key;}); if(existing) existing.value=wealth(); else state.snapshots.push({month:key,value:wealth()}); state.snapshots=state.snapshots.slice(-12); }
+function snapshot(){
+  const dateKey=iso(new Date()), monthKey=dateKey.slice(0,7);
+  const existing=state.snapshots.find(function(s){return String(s.date||"").slice(0,10)===dateKey || (!s.date&&s.month===monthKey);});
+  if(existing){existing.date=dateKey;existing.month=monthKey;existing.value=wealth();existing.source=existing.source||"app";}
+  else state.snapshots.push({date:dateKey,month:monthKey,value:wealth(),source:"app"});
+  state.snapshots=state.snapshots
+    .filter(function(s){return s && (s.date||s.month) && Number.isFinite(Number(s.value));})
+    .sort(function(a,b){return String(a.date||a.month).localeCompare(String(b.date||b.month));})
+    .slice(-1825);
+}
 function dot(score){return score>=75?"good":score>=50?"warn":"danger";}
 function typeName(t){return {income:"Ingreso",expense:"Gasto",investment_buy:"Inversion",investment_sell:"Venta",investment:"Inversion",transfer:"Transferencia",dividend:"Dividendo",fee:"Comision"}[t]||"Movimiento";}
 function badge(t){const cls=t==="income"||t==="dividend"?"badge-income":t==="expense"||t==="fee"?"badge-expense":"badge-investment";return '<span class="badge '+cls+'">'+typeName(t)+'</span>';}
@@ -166,7 +175,8 @@ function coachVisual(className){return '<div class="'+className+'" aria-hidden="
 function backendNotice(){
   const status=api.backendStatus();
   if(status.connected) return '<div class="backend-status backend-online"><span data-icon="check"></span><span>Backend conectado · Supabase</span></div>';
-  return '<div class="backend-status backend-error"><span data-icon="alert"></span><span>Backend no disponible. La aplicacion esta en modo solo lectura local.'+(status.error?" "+safe(status.error):"")+'</span></div>';
+  if(status.mode==="local") return '<div class="backend-status backend-online"><span data-icon="info"></span><span>Modo local de desarrollo. Los datos se guardan solo en este navegador.</span></div>';
+  return '<div class="backend-status backend-error"><span data-icon="alert"></span><span>Backend no disponible. Los datos de Supabase no se pueden cargar ni guardar ahora.'+(status.error?" "+safe(status.error):"")+'</span></div>';
 }
 function renderVersion(){
   const el=document.getElementById("app-version");
@@ -174,6 +184,7 @@ function renderVersion(){
 }
 function publishState(){
   window.BORJAI_STATE = state;
+  window.dispatchEvent(new CustomEvent("borjai:state", { detail: state }));
 }
 function chart(){
   const snapshots = Array.isArray(state.snapshots) ? state.snapshots : [];
@@ -282,8 +293,9 @@ function dashboard(){
   let acc=0, vars=total?allocation.map(function(a,i){acc+=a.value;return "--c"+(i+1)+":"+a.color+";--p"+(i+1)+":"+(acc/total*100).toFixed(2)+"%;";}).join(""):"";
   const rows=total?allocation.map(function(a){return '<div class="allocation-row"><i style="--color:'+a.color+'"></i><span>'+a.name+'</span><strong>'+money(a.value)+' <span class="panel-note">'+percent(a.value/total)+'</span></strong></div>';}).join(""):'<div class="table-empty">Aun no hay patrimonio registrado.</div>';
   const quick=[["Donde invierto este mes?","inversion","trend"],["Como va mi patrimonio?","patrimonio","chart"],["Que gastos puedo recortar?","gastos","receipt"],["Riesgos detectados","riesgos","alert"]].map(function(q){return '<button class="quick-chip" data-action="ask" data-q="'+q[1]+'"><span data-icon="'+q[2]+'"></span>'+q[0]+'</button>';}).join("");
+  const changeRate = prior ? percent(change/prior) : "sin histórico";
   return '<section class="view">'+head("Panel de control","Tu dinero, con contexto","Asi estas en "+labelMonth(nowMonth()),'<button class="btn" data-action="movement"><span data-icon="plus"></span>Registrar movimiento</button><button class="btn btn-primary" data-view="importar"><span data-icon="upload"></span>Anadir informacion</button>')+backendNotice()+
-    '<div class="dashboard-grid"><div class="hero-metrics"><section class="wealth-panel"><div class="metric-label">Patrimonio neto</div><div class="wealth-value">'+money(w)+'</div><div class="metric-delta '+(change<0?"is-down":"")+'"><strong>'+signed(change)+" ("+percent(change/prior)+')</strong><span>este mes</span></div><p class="metric-subline"><b>'+money(m.savings)+'</b> de ahorro, <b>'+money(m.invested)+'</b> aportados a cartera.</p>'+miniChart()+'</section><section class="health-panel">'+ring(h.score)+'<p class="health-caption">'+(h.score>=75?"Base financiera solida":"Hay palancas claras de mejora")+'</p></section></div>'+
+    '<div class="dashboard-grid"><div class="hero-metrics"><section class="wealth-panel"><div class="metric-label">Patrimonio neto</div><div class="wealth-value">'+money(w)+'</div><div class="metric-delta '+(change<0?"is-down":"")+'"><strong>'+signed(change)+" ("+changeRate+')</strong><span>este mes</span></div><p class="metric-subline"><b>'+money(m.savings)+'</b> de ahorro, <b>'+money(m.invested)+'</b> aportados a cartera.</p>'+miniChart()+'</section><section class="health-panel">'+ring(h.score)+'<p class="health-caption">'+(h.score>=75?"Base financiera solida":"Hay palancas claras de mejora")+'</p></section></div>'+
     '<div class="dashboard-two"><section class="chart-panel"><div class="panel-head"><div><h2 class="panel-title">Evolucion del patrimonio</h2><span class="panel-note">Ultimos 12 meses</span></div><select class="period-select"><option>12 meses</option></select></div>'+chart()+'</section><section class="recommendation-panel"><div class="recommendation-top"><div class="recommendation-icon"><span data-icon="sparkles"></span></div><div><div class="section-kicker">Que haria hoy</div><h2>'+r.title+'</h2></div></div><p>'+r.text+'</p><div class="recommendation-facts"><div class="fact"><span>Propuesta</span><strong>'+r.main+'</strong></div><div class="fact"><span>Margen liquido</span><strong>'+r.detail+'</strong></div></div><div class="disclaimer">Analisis con los datos financieros disponibles. No incluye cotizaciones ni noticias en tiempo real.</div></section></div>'+
     '<section class="distribution-panel"><div class="panel-head"><div><h2 class="panel-title">Distribucion del patrimonio</h2><span class="panel-note">Activos menos deudas</span></div><button class="text-button" data-view="patrimonio">Ver patrimonio</button></div><div class="distribution-content"><div class="donut-wrap"><div class="donut" style="'+vars+'"></div><div class="donut-total"><strong>'+money(w)+'</strong><span>Total</span></div></div><div class="allocation-list">'+rows+'</div></div></section>'+
     '<div class="metric-grid">'+metric("Ingresos",money(m.income),"Este mes","upload","positive")+metric("Gastos",money(m.expense),(m.expense-old.expense>=0?"+":"")+percent((m.expense-old.expense)/(old.expense||1))+" frente al mes anterior","receipt",m.expense>old.expense?"negative":"")+metric("Ahorro",money(m.savings),percent(m.rate)+" de tus ingresos","wallet",m.savings>=0?"positive":"negative")+metric("Inversion",money(m.invested),"No se contabiliza como gasto","chart","")+'</div>'+

@@ -1,17 +1,18 @@
 import { LOCAL_STORAGE_KEY } from "./config.js";
 
 const KEY = "borjai:wealth-range";
-const PERIODS = [
+export const WEALTH_PERIODS = [
   ["1d", "1D", 1, "Último día"],
   ["1w", "1S", 7, "Última semana"],
   ["1m", "1M", 30, "Último mes"],
   ["3m", "3M", 90, "Últimos 3 meses"],
   ["6m", "6M", 180, "Últimos 6 meses"],
-  ["1y", "1A", 365, "Últimos 12 meses"],
+  ["1y", "1A", 365, "Último año"],
   ["3y", "3A", 1095, "Últimos 3 años"],
   ["5y", "5A", 1825, "Últimos 5 años"],
   ["max", "MAX", null, "Todo el histórico"]
 ];
+const PERIODS = WEALTH_PERIODS;
 
 function money(n) {
   return new Intl.NumberFormat("es-ES", {
@@ -24,7 +25,7 @@ function pct(n) {
   }).format(Number(n || 0));
 }
 function readState() {
-  if (window.BORJAI_STATE && typeof window.BORJAI_STATE === "object") return window.BORJAI_STATE;
+  if (globalThis.BORJAI_STATE && typeof globalThis.BORJAI_STATE === "object") return globalThis.BORJAI_STATE;
   try {
     const raw = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "null");
     return raw && typeof raw === "object" ? raw : null;
@@ -50,14 +51,21 @@ function cutoff(days) {
   return d.toISOString().slice(0, 10);
 }
 function selectedPeriod() {
-  const id = localStorage.getItem(KEY) || "1y";
+  const id = globalThis.localStorage?.getItem(KEY) || "1y";
   return PERIODS.find((p) => p[0] === id) || PERIODS[5];
 }
-function filteredRows() {
-  const [, , days] = selectedPeriod();
-  const rows = rowsFromState(readState());
-  const c = cutoff(days);
+export function filterWealthRows(rows, periodId, now = new Date()) {
+  const period = PERIODS.find((p) => p[0] === periodId) || PERIODS[5];
+  if (period[2] == null) return rows;
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - period[2]);
+  const c = d.toISOString().slice(0, 10);
   return rows.filter((r) => !c || r.date >= c);
+}
+function filteredRows() {
+  const [periodId] = selectedPeriod();
+  return filterWealthRows(rowsFromState(readState()), periodId);
 }
 function labelDate(d) {
   return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" })
@@ -107,7 +115,7 @@ function buildSvg(rows) {
     grid + `<path d="${area}" class="area"/><path d="${line}" class="line"/>` +
     pts.slice(-1).map((p) => `<circle class="dot" cx="${p.x}" cy="${p.y}" r="5"/>`).join("") + labels + `</svg>`;
 }
-function metrics(rows) {
+export function summarizeWealthRows(rows) {
   if (!rows.length) return null;
   const first = rows[0].value, last = rows.at(-1).value;
   const change = last - first;
@@ -117,6 +125,9 @@ function metrics(rows) {
     max: Math.max(...rows.map((r) => r.value)),
     min: Math.min(...rows.map((r) => r.value))
   };
+}
+function metrics(rows) {
+  return summarizeWealthRows(rows);
 }
 function ensureStyles() {
   if (document.getElementById("wealth-dashboard-styles")) return;
@@ -185,7 +196,10 @@ function boot() {
   const panel = document.querySelector(".chart-panel");
   if (panel) wirePanel(panel);
 }
-const observer = new MutationObserver(() => boot());
-observer.observe(document.body, { childList: true, subtree: true });
-boot();
-setInterval(boot, 1500);
+if (typeof document !== "undefined" && document.body && typeof window !== "undefined") {
+  const observer = new MutationObserver(() => boot());
+  observer.observe(document.body, { childList: true, subtree: true });
+  window.addEventListener("borjai:state", () => boot());
+  boot();
+  setInterval(boot, 1500);
+}

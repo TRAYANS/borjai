@@ -137,7 +137,7 @@ GitHub Pages puede cargar configuracion publica desde `window.BORJAI_CONFIG` ant
 
 La anon key de Supabase puede estar en cliente si RLS esta bien configurado. Nunca deben incluirse `service_role`, claves privadas, claves de IA ni claves privadas de APIs de mercado en el frontend.
 
-En V2.0, si el backend no esta disponible, BorjaAI puede leer `borjai:mvp:v1` como cache/migracion para no dejar la pantalla vacia, pero no debe presentar ese modo como persistencia real. Los guardados deben fallar de forma visible salvo en modo desarrollo local explicito.
+En V2.0, si el backend no esta disponible en modo `api`, BorjaAI no usa `borjai:mvp:v1` como fallback silencioso de persistencia. La pantalla muestra un aviso de backend no disponible y los guardados fallan de forma visible. `localStorage` queda limitado a cache, migracion y modo desarrollo local explicito.
 
 ### Migracion desde localStorage
 
@@ -165,6 +165,8 @@ app.js
   -> Supabase PostgreSQL
 ```
 
+Los endpoints serverless de estado usan la API REST de Supabase en servidor. Esto evita depender de capacidades de runtime como WebSocket nativo y mantiene `SUPABASE_SERVICE_ROLE_KEY` exclusivamente en backend cuando se configure.
+
 Variables necesarias en Vercel:
 
 - `SUPABASE_URL`
@@ -172,6 +174,12 @@ Variables necesarias en Vercel:
 - `SUPABASE_SERVICE_ROLE_KEY` y `BORJAI_OWNER_ID` son recomendadas para un backend estable de usuario unico sin exponer secretos al navegador.
 
 Sin `service_role`, el backend puede operar con tokens Supabase de usuario y RLS, pero la identidad anonima sigue dependiendo de la sesion del navegador. Esa limitacion debe resolverse antes de considerar la persistencia multi-dispositivo como cerrada.
+
+### Health y evolucion patrimonial
+
+`/api/state/health` devuelve HTTP `200` solo si Supabase esta configurado, accesible y puede leer las tablas esperadas. Devuelve `5xx` cuando el backend falla, con diagnostico seguro y sin exponer secretos.
+
+La evolucion patrimonial se basa en `wealth_snapshots`. BorjaAI crea o actualiza un snapshot diario cuando se guardan cambios financieros. La grafica soporta `1D`, `1S`, `1M`, `3M`, `6M`, `1A`, `3A`, `5A` y `MAX`; si el historico disponible no alcanza para calcular variacion, muestra un estado vacio en vez de inventar puntos.
 
 ## Seguridad desde el inicio
 

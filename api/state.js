@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   } catch (error) {
     const message = error?.message || "No se pudo acceder al estado financiero.";
-    const status = /Sesión|Supabase no está configurado/.test(message) ? 401 : 500;
+    const status = /Supabase no está configurado/.test(message) ? 503 : /Sesión/.test(message) ? 401 : 500;
     return res.status(status).json({ ok: false, error: message });
   }
 }

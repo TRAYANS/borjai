@@ -1,5 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
-
 const RATE = new Map();
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 12;
@@ -16,10 +14,13 @@ async function requireUser(req) {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const key = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
   if (!url || !key) throw new Error("Supabase no está configurado.");
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-  const result = await supabase.auth.getUser(token);
-  if (result.error || !result.data?.user) throw new Error("Sesión de BorjaAI no válida.");
-  return result.data.user;
+  const response = await fetch(`${String(url).replace(/\/$/, "")}/auth/v1/user`, {
+    headers: { apikey: key, Authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  const user = await response.json().catch(() => ({}));
+  if (!response.ok || !user?.id) throw new Error("Sesión de BorjaAI no válida.");
+  return user;
 }
 
 function rateLimit(req) {
@@ -99,8 +100,8 @@ Rules:
 - The final response must be valid JSON.parse().`;
 
     const model = await resolveGroqModel(apiKey, process.env.GROQ_VISION_MODEL, [
-      "qwen/qwen3.8-27b",
-      "qwen/qwen3.6-27b"
+      "qwen/qwen3.6-27b",
+      "qwen/qwen3.8-27b"
     ]);
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
