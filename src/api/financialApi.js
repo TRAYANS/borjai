@@ -2,9 +2,15 @@ import { hasSupabaseConfig, LOCAL_BACKUP_KEY, LOCAL_STORAGE_KEY, MIGRATION_STATU
 import { createSupabaseClient } from "../db/supabaseClient.js";
 import { createLocalStorageRepository } from "../repositories/localStorageRepository.js";
 import { createSupabaseRepository } from "../repositories/supabaseRepository.js";
+import { createServerApiRepository } from "../repositories/serverApiRepository.js";
 import { normalizeState, stateCounts, validateLegacyState } from "../repositories/stateMapper.js";
 
 function today() { return new Date().toISOString().slice(0, 10); }
+function statusMode(repository) {
+  if (repository.kind === "server-api") return "api";
+  if (repository.kind === "supabase") return "supabase";
+  return "local";
+}
 function wealthFromState(state) {
   const accounts = (state.accounts || []).reduce((sum, a) => sum + Number(a.balance || 0), 0);
   const assets = (state.assets || []).reduce((sum, a) => sum + Number(a.value || 0), 0);
@@ -59,9 +65,39 @@ export async function createFinancialApi(options) {
   const config = await loadRuntimeConfig(options.config);
   const localRepository = createLocalStorageRepository(localKey, fallbackFactory, storage);
   let activeRepository = localRepository;
-  let backendStatus = { mode: "local", connected: false, error: "" };
+  let sessionClient = null;
+  let backendStatus = { mode: "initializing", connected: false, error: "" };
+
+  const localDevelopmentMode = !hasSupabaseConfig(config) && config.backendMode !== "api";
+
+  async function getAccessToken() {
+    if (!sessionClient) {
+      if (!hasSupabaseConfig(config)) return "";
+      sessionClient = await createSupabaseClient(config);
+    }
+    const result = await sessionClient.auth.getSession();
+    if (result.error) throw result.error;
+    return result.data?.session?.access_token || "";
+  }
+
+  async function connectServerApi() {
+    const repo = createServerApiRepository({
+      baseUrl: config.apiBaseUrl || "",
+      getAccessToken
+    });
+    await repo.health();
+    activeRepository = repo;
+    backendStatus = { mode: "api", connected: true, error: "" };
+    return repo;
+  }
 
   async function connectBackend() {
+    if (localDevelopmentMode) {
+      activeRepository = localRepository;
+      backendStatus = { mode: "local", connected: false, error: "" };
+      return localRepository;
+    }
+    if (config.backendMode === "api") return connectServerApi();
     if (!hasSupabaseConfig(config)) throw new Error("Supabase no está configurado en producción.");
     const client = await createSupabaseClient(config);
     if (!client) throw new Error("No se pudo crear el cliente Supabase.");
@@ -76,10 +112,11 @@ export async function createFinancialApi(options) {
     await connectBackend();
   } catch (e) {
     backendStatus = {
-      mode: hasSupabaseConfig(config) ? "unavailable" : "local",
+      mode: localDevelopmentMode ? "local" : "unavailable",
       connected: false,
       error: e.message || "No se pudo conectar con Supabase."
     };
+    if (localDevelopmentMode) activeRepository = localRepository;
   }
 
   async function loadFromBackend() {
@@ -90,7 +127,7 @@ export async function createFinancialApi(options) {
   async function load() {
     try {
       const remote = await loadFromBackend();
-      backendStatus = { mode: "supabase", connected: true, error: "" };
+      backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
       const localState = localRepository.readRaw();
       const validation = validateLegacyState(localState);
       if (validation.ok) {
@@ -121,12 +158,16 @@ export async function createFinancialApi(options) {
       return ensured.state;
     } catch (e) {
       backendStatus = {
-        mode: hasSupabaseConfig(config) ? "unavailable" : "local",
+        mode: localDevelopmentMode ? "local" : "unavailable",
         connected: false,
         error: e.message || "Backend no disponible."
       };
-      activeRepository = localRepository;
-      return localRepository.load();
+      if (localDevelopmentMode) {
+        activeRepository = localRepository;
+        return localRepository.load();
+      }
+      const local = localRepository.readRaw();
+      return validateLegacyState(local).ok ? normalizeState(local, fallbackFactory) : fallbackFactory();
     }
   }
 
@@ -144,14 +185,18 @@ export async function createFinancialApi(options) {
       const finalState = ensureDailySnapshot(normalized).state;
       await localRepository.saveState(finalState);
       const saved = await activeRepository.saveState(finalState);
-      backendStatus = { mode: "supabase", connected: true, error: "" };
+      backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
       return saved;
     } catch (e) {
       backendStatus = {
-        mode: hasSupabaseConfig(config) ? "unavailable" : "local",
+        mode: localDevelopmentMode ? "local" : "unavailable",
         connected: false,
         error: e.message || "No se pudo guardar en Supabase."
       };
+      if (localDevelopmentMode) {
+        await localRepository.saveState(normalized);
+        return normalized;
+      }
       throw e;
     }
   }
@@ -161,14 +206,15 @@ export async function createFinancialApi(options) {
       if (activeRepository.kind !== "supabase") await connectBackend();
       const next = await activeRepository.reset();
       await localRepository.saveState(next);
-      backendStatus = { mode: "supabase", connected: true, error: "" };
+      backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
       return next;
     } catch (e) {
       backendStatus = {
-        mode: hasSupabaseConfig(config) ? "unavailable" : "local",
+        mode: localDevelopmentMode ? "local" : "unavailable",
         connected: false,
         error: e.message || "No se pudo restablecer en backend."
       };
+      if (localDevelopmentMode) return localRepository.reset();
       throw e;
     }
   }
@@ -181,13 +227,13 @@ export async function createFinancialApi(options) {
     try {
       if (activeRepository.kind !== "supabase") await connectBackend();
       const result = await activeRepository.migrateFromLocal(localState);
-      backendStatus = { mode: "supabase", connected: true, error: "" };
+      backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
       const status = Object.assign({ createdAt: new Date().toISOString() }, result);
       localRepository.setMigrationStatus(MIGRATION_STATUS_KEY, status);
       return status;
     } catch (e) {
       backendStatus = {
-        mode: hasSupabaseConfig(config) ? "unavailable" : "local",
+        mode: localDevelopmentMode ? "local" : "unavailable",
         connected: false,
         error: e.message || "No se pudo migrar al backend."
       };
@@ -195,12 +241,6 @@ export async function createFinancialApi(options) {
       localRepository.setMigrationStatus(MIGRATION_STATUS_KEY, status);
       return status;
     }
-  }
-
-  async function getAccessToken() {
-    if (activeRepository.kind !== "supabase") await connectBackend();
-    if (typeof activeRepository.getAccessToken !== "function") throw new Error("No se pudo obtener la sesión de Supabase.");
-    return activeRepository.getAccessToken();
   }
 
   return {

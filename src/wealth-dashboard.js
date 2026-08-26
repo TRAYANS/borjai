@@ -24,6 +24,7 @@ function pct(n) {
   }).format(Number(n || 0));
 }
 function readState() {
+  if (window.BORJAI_STATE && typeof window.BORJAI_STATE === "object") return window.BORJAI_STATE;
   try {
     const raw = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "null");
     return raw && typeof raw === "object" ? raw : null;

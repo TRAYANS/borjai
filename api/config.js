@@ -12,19 +12,22 @@ export default async function handler(req, res) {
     groq: Boolean(process.env.GROQ_API_KEY)
   };
   const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+  const serverStateConfigured = Boolean(supabaseConfigured && (process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.BORJAI_OWNER_ID : true));
 
   res.setHeader("Cache-Control", "no-store, max-age=0");
   return res.status(200).json({
     supabaseUrl,
     supabaseAnonKey,
-    backendMode: supabaseConfigured ? "supabase" : "local",
+    apiBaseUrl: "",
+    backendMode: serverStateConfigured ? "api" : "unavailable",
     supabaseConfigured,
+    serverStateConfigured,
     groqConfigured: configured.groq,
     aiCouncil: {
       enabled: Object.values(configured).some(Boolean),
       providers: configured,
       synthesis: configured.openai ? "openai" : configured.gemini ? "gemini" : configured.anthropic ? "anthropic" : configured.groq ? "groq" : null
     },
-    version: "V.1.6.0"
+    version: "V2.0"
   });
 }

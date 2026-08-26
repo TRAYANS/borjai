@@ -53,6 +53,21 @@ function validateData(data) {
   return data;
 }
 
+async function resolveGroqModel(apiKey, preferred, candidates) {
+  const ordered = [preferred, ...candidates].filter(Boolean);
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return ordered[0];
+    const available = new Set((payload.data || []).map((model) => model.id).filter(Boolean));
+    return ordered.find((model) => available.has(model)) || ordered[0];
+  } catch (_) {
+    return ordered[0];
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   if (!rateLimit(req)) return res.status(429).json({ error: "Demasiadas solicitudes. Espera un minuto y vuelve a intentarlo." });
@@ -83,11 +98,16 @@ Rules:
 - date uses YYYY-MM-DD only when clearly identifiable.
 - The final response must be valid JSON.parse().`;
 
+    const model = await resolveGroqModel(apiKey, process.env.GROQ_VISION_MODEL, [
+      "qwen/qwen3.8-27b",
+      "qwen/qwen3.6-27b"
+    ]);
+
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: process.env.GROQ_VISION_MODEL || "qwen/qwen3.6-27b",
+        model,
         temperature: 0,
         reasoning_effort: "none",
         reasoning_format: "hidden",

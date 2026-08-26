@@ -7,7 +7,8 @@ export function readRuntimeConfig(source) {
   return {
     supabaseUrl: runtime.supabaseUrl || "",
     supabaseAnonKey: runtime.supabaseAnonKey || "",
-    backendMode: runtime.backendMode || "auto"
+    apiBaseUrl: runtime.apiBaseUrl || "",
+    backendMode: runtime.backendMode || "api"
   };
 }
 

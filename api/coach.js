@@ -102,6 +102,21 @@ async function groq({ apiKey, model, system, user }) {
   return payload?.choices?.[0]?.message?.content || "";
 }
 
+async function resolveGroqModel(apiKey, preferred, candidates) {
+  const ordered = [preferred, ...candidates].filter(Boolean);
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return ordered[0];
+    const available = new Set((payload.data || []).map((item) => item.id).filter(Boolean));
+    return ordered.find((item) => available.has(item)) || ordered[0];
+  } catch (_) {
+    return ordered[0];
+  }
+}
+
 const SPECIALIST_SYSTEM = `Eres un analista financiero senior dentro del consejo IA de BorjaAI.
 No inventes cifras. Usa exclusivamente el contexto entregado y, si se indica, datos de mercado recientes.
 Distingue hechos, cálculos e inferencias. No presentes una recomendación de inversión como certeza.
@@ -134,19 +149,25 @@ export default async function handler(req, res) {
 
     if (process.env.OPENAI_API_KEY) {
       providers.push("openai");
-      jobs.push(openAI({ apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_COACH_MODEL || "gpt-5.6-luna", system: SPECIALIST_SYSTEM, user: userPrompt, webSearch: false }));
+      jobs.push(openAI({ apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_COACH_MODEL || "gpt-4.1", system: SPECIALIST_SYSTEM, user: userPrompt, webSearch: false }));
     }
     if (process.env.ANTHROPIC_API_KEY) {
       providers.push("anthropic");
-      jobs.push(anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_COACH_MODEL || "claude-opus-5", system: SPECIALIST_SYSTEM, user: userPrompt }));
+      jobs.push(anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_COACH_MODEL || "claude-3-5-sonnet-latest", system: SPECIALIST_SYSTEM, user: userPrompt }));
     }
     if (process.env.GEMINI_API_KEY) {
       providers.push("gemini");
-      jobs.push(gemini({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_COACH_MODEL || "gemini-3.7-flash", system: SPECIALIST_SYSTEM, user: userPrompt }));
+      jobs.push(gemini({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_COACH_MODEL || "gemini-1.5-flash", system: SPECIALIST_SYSTEM, user: userPrompt }));
     }
     if (process.env.GROQ_API_KEY) {
       providers.push("groq");
-      jobs.push(groq({ apiKey: process.env.GROQ_API_KEY, model: process.env.GROQ_COACH_MODEL || "qwen/qwen3.6-27b", system: SPECIALIST_SYSTEM, user: userPrompt }));
+      const model = await resolveGroqModel(process.env.GROQ_API_KEY, process.env.GROQ_COACH_MODEL, [
+        "qwen/qwen3.8-27b",
+        "qwen/qwen3.6-27b",
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b"
+      ]);
+      jobs.push(groq({ apiKey: process.env.GROQ_API_KEY, model, system: SPECIALIST_SYSTEM, user: userPrompt }));
     }
 
     if (!jobs.length) return res.status(503).json({ error: "No hay ningún proveedor IA configurado en Vercel." });
@@ -163,21 +184,21 @@ export default async function handler(req, res) {
 
     if (process.env.OPENAI_API_KEY) {
       try {
-        answer = await openAI({ apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_JUDGE_MODEL || process.env.OPENAI_COACH_MODEL || "gpt-5.6-luna", system: SYNTHESIS_SYSTEM, user: synthesisUser, webSearch: Boolean(useWeb) });
+        answer = await openAI({ apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_JUDGE_MODEL || process.env.OPENAI_COACH_MODEL || "gpt-4.1", system: SYNTHESIS_SYSTEM, user: synthesisUser, webSearch: Boolean(useWeb) });
         judge = "openai-judge";
       } catch (_) {
         // Keep best successful specialist answer.
       }
     } else if (process.env.GEMINI_API_KEY && successful.some((x) => x.provider === "gemini")) {
       try {
-        const raw = await gemini({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_COACH_MODEL || "gemini-3.7-flash", system: SYNTHESIS_SYSTEM, user: synthesisUser });
+        const raw = await gemini({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_COACH_MODEL || "gemini-1.5-flash", system: SYNTHESIS_SYSTEM, user: synthesisUser });
         const parsed = jsonResponse(raw);
         answer = parsed?.answer || raw;
         judge = "gemini-judge";
       } catch (_) {}
     } else if (process.env.ANTHROPIC_API_KEY && successful.some((x) => x.provider === "anthropic")) {
       try {
-        answer = await anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_JUDGE_MODEL || process.env.ANTHROPIC_COACH_MODEL || "claude-opus-5", system: SYNTHESIS_SYSTEM, user: synthesisUser });
+        answer = await anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_JUDGE_MODEL || process.env.ANTHROPIC_COACH_MODEL || "claude-3-5-sonnet-latest", system: SYNTHESIS_SYSTEM, user: synthesisUser });
         judge = "anthropic-judge";
       } catch (_) {}
     }

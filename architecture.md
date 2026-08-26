@@ -80,13 +80,13 @@ src/api/financialApi.js
 Repository
     |------------------------|
     v                        v
-SupabaseRepository      LocalStorageRepository
+ServerApiRepository     SupabaseRepository legacy     LocalStorageRepository
     |                        |
     v                        v
-PostgreSQL + RLS        borjai:mvp:v1 fallback
+Vercel API              PostgreSQL + RLS              borjai:mvp:v1 cache/migracion
 ```
 
-`app.js` no accede directamente a Supabase. La UI llama a `financialApi`, `financialApi` decide el repositorio activo y los repositorios traducen el estado de BorjaAI a almacenamiento.
+`app.js` no accede directamente a Supabase. La UI llama a `financialApi`, `financialApi` usa `ServerApiRepository` como camino principal y el servidor escribe en Supabase/PostgreSQL. El acceso directo a Supabase queda como compatibilidad legacy, no como ruta principal de la aplicacion.
 
 El motor financiero se mantiene puro:
 
@@ -104,7 +104,7 @@ No conoce `localStorage`, Supabase, SQL, autenticacion ni red.
 
 ### Supabase
 
-El esquema inicial vive en `src/db/schema.sql` y se replica en `src/db/migrations/001_initial_schema.sql`.
+El esquema inicial vive en `src/db/schema.sql` y se replica en `src/db/migrations/001_initial_schema.sql`. V2.0 añade `src/db/migrations/002_v2_backend_hardening.sql` con indices y notas operativas para el backend server-side.
 
 Tablas iniciales:
 
@@ -137,7 +137,7 @@ GitHub Pages puede cargar configuracion publica desde `window.BORJAI_CONFIG` ant
 
 La anon key de Supabase puede estar en cliente si RLS esta bien configurado. Nunca deben incluirse `service_role`, claves privadas, claves de IA ni claves privadas de APIs de mercado en el frontend.
 
-Si no hay configuracion o no hay sesion valida, BorjaAI cae a modo local y conserva los datos en `borjai:mvp:v1`.
+En V2.0, si el backend no esta disponible, BorjaAI puede leer `borjai:mvp:v1` como cache/migracion para no dejar la pantalla vacia, pero no debe presentar ese modo como persistencia real. Los guardados deben fallar de forma visible salvo en modo desarrollo local explicito.
 
 ### Migracion desde localStorage
 
@@ -151,7 +151,27 @@ La migracion parte de `borjai:mvp:v1` y es defensiva:
 6. Recarga desde Supabase y compara conteos.
 7. Guarda el resultado en `borjai:migration:v1.2:status`.
 
-El estado local original no se borra. Si el backend falla, la app sigue en modo local.
+El estado local original no se borra. Si el backend falla, la migracion queda marcada como fallida y los datos locales permanecen intactos para reintentar.
+
+## V2.0 - Backend y persistencia real
+
+Camino principal:
+
+```text
+app.js
+  -> src/api/financialApi.js
+  -> src/repositories/serverApiRepository.js
+  -> /api/state
+  -> Supabase PostgreSQL
+```
+
+Variables necesarias en Vercel:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` y `BORJAI_OWNER_ID` son recomendadas para un backend estable de usuario unico sin exponer secretos al navegador.
+
+Sin `service_role`, el backend puede operar con tokens Supabase de usuario y RLS, pero la identidad anonima sigue dependiendo de la sesion del navegador. Esa limitacion debe resolverse antes de considerar la persistencia multi-dispositivo como cerrada.
 
 ## Seguridad desde el inicio
 

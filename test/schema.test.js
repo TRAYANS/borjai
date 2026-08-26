@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const schema = readFileSync(new URL("../src/db/schema.sql", import.meta.url), "utf8");
+const hardening = readFileSync(new URL("../src/db/migrations/002_v2_backend_hardening.sql", import.meta.url), "utf8");
 
 test("el esquema Supabase es multiusuario y activa RLS", function() {
   ["accounts", "categories", "transactions", "assets", "liabilities", "investments", "goals", "imports", "wealth_snapshots"].forEach(function(table) {
@@ -23,4 +24,11 @@ test("el esquema prepara transferencias, vivienda e hipoteca sin implementarlas"
   assert.match(schema, /'transfer'/);
   assert.match(schema, /'real_estate'/);
   assert.match(schema, /'mortgage'/);
+});
+
+test("la migracion V2.0 anade indices sin desactivar RLS", function() {
+  assert.match(hardening, /transactions_user_date_idx/);
+  assert.match(hardening, /wealth_snapshots_user_date_idx/);
+  assert.doesNotMatch(hardening, /disable row level security/i);
+  assert.match(hardening, /SUPABASE_SERVICE_ROLE_KEY/);
 });

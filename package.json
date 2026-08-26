@@ -1,10 +1,12 @@
 {
   "name": "borjai",
-  "version": "1.6.1",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "lint": "find . -name '*.js' -not -path './node_modules/*' -exec node --check {} \\;",
+    "build": "npm test && npm run lint",
     "dev": "python3 -m http.server 4173"
   },
   "dependencies": {

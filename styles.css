@@ -201,6 +201,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .backend-status [data-icon] { width: 16px; height: 16px; color: var(--blue); }
 .backend-status.backend-online { border-color: rgba(69, 196, 106, 0.24); background: var(--green-soft); color: #bdf2cc; }
 .backend-status.backend-online [data-icon] { color: var(--green); }
+.backend-status.backend-error { border-color: rgba(255, 103, 112, 0.28); background: rgba(255, 103, 112, 0.08); color: #ffc4c9; }
+.backend-status.backend-error [data-icon] { color: var(--red); }
 
 .view-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
 .view-head h1 { margin: 4px 0 0; font-size: clamp(25px, 3vw, 33px); line-height: 1.15; letter-spacing: 0; }

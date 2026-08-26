@@ -39,7 +39,7 @@ test("el repositorio local conserva compatibilidad con borjai:mvp:v1", async fun
   const storage = memoryStorage();
   const state = sampleState();
   storage.setItem("borjai:mvp:v1", JSON.stringify(state));
-  const api = await createFinancialApi({ localKey: "borjai:mvp:v1", fallbackFactory: sampleState, storage: storage });
+  const api = await createFinancialApi({ localKey: "borjai:mvp:v1", fallbackFactory: sampleState, storage: storage, config: { backendMode: "local" } });
   const loaded = await api.load();
   assert.equal(loaded.accounts.length, 2);
   assert.equal(api.backendStatus().mode, "local");
