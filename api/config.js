@@ -35,6 +35,6 @@ export default async function handler(req, res) {
       providers: configured,
       synthesis: configured.openai ? "openai" : configured.gemini ? "gemini" : configured.anthropic ? "anthropic" : configured.groq ? "groq" : null
     },
-    version: "V2.0"
+    version: "V1.7"
   });
 }
