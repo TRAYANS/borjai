@@ -1,5 +1,6 @@
 import { loadRuntimeConfig, hasSupabaseConfig } from "./config.js";
 import { createSupabaseClient } from "./db/supabaseClient.js";
+import { runOneTimeEconomicReset } from "./one-time-economic-reset.js";
 
 const ACCESS_KEY = "borjai:access";
 const SESSION_KEY = "borjai:supabase:session:v1";
@@ -79,7 +80,13 @@ async function start() {
   client = await createSupabaseClient(config); const user = (await client.auth.getUser()).data.user;
   const authType = (() => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null")?.auth_type || ""; } catch (_) { return ""; } })();
   if (user && !isAllowedEmail(user.email)) { await client.auth.signOut(); screen("login", "Esta cuenta no está autorizada para BORJAI."); return; }
-  if (user && isAllowedEmail(user.email) && user.email_confirmed_at) { if (authType === "recovery") { screen("recover", "Has verificado tu identidad. Elige una nueva contraseña."); return; } localStorage.setItem(AUTHENTICATED_KEY, "1"); localStorage.setItem(ACCESS_KEY, "ok"); await loadApplication(); return; }
+  if (user && isAllowedEmail(user.email) && user.email_confirmed_at) {
+    if (authType === "recovery") { screen("recover", "Has verificado tu identidad. Elige una nueva contraseña."); return; }
+    localStorage.setItem(AUTHENTICATED_KEY, "1"); localStorage.setItem(ACCESS_KEY, "ok");
+    await runOneTimeEconomicReset();
+    await loadApplication();
+    return;
+  }
   screen("login", user ? "Tu cuenta aún no está confirmada. Revisa el correo de activación y vuelve a iniciar sesión." : "");
 }
 start().catch((error) => screen("login", error?.message || "No se pudo iniciar la autenticación."));
