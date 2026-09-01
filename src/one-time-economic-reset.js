@@ -1,4 +1,4 @@
-import { loadRuntimeConfig, hasSupabaseConfig } from "./config.js";
+import { loadRuntimeConfig, hasSupabaseConfig, LOCAL_STORAGE_KEY, LOCAL_BACKUP_KEY, MIGRATION_STATUS_KEY } from "./config.js";
 import { createSupabaseClient } from "./db/supabaseClient.js";
 
 const RESET_KEY = "borjai:economic-reset:v2";
@@ -21,12 +21,10 @@ export async function runOneTimeEconomicReset() {
     if (result.error) throw new Error(`No se pudo limpiar ${table}: ${result.error.message}`);
   }
 
-  // Elimina cualquier copia local antigua para que no pueda resucitar datos borrados.
-  const keys = [];
-  for (let i = 0; i < localStorage.length; i += 1) keys.push(localStorage.key(i));
-  keys.filter((key) => key && (key.startsWith("borjai:") || key.includes("borjai")))
-    .forEach((key) => localStorage.removeItem(key));
-
+  // Borra solo las copias económicas locales; conserva la sesión de Supabase y el acceso.
+  localStorage.removeItem(LOCAL_STORAGE_KEY);
+  localStorage.removeItem(LOCAL_BACKUP_KEY);
+  localStorage.removeItem(MIGRATION_STATUS_KEY);
   localStorage.setItem(RESET_KEY, "done");
   return true;
 }
