@@ -19,7 +19,7 @@ const today = () => new Date().toISOString().slice(0,10);
 const readState = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (_) { return null; } };
 const accounts = () => { const s = readState(); return Array.isArray(s?.accounts) ? s.accounts : []; };
 const accountOptions = (selected) => accounts().map(a => `<option value="${esc(a.id)}"${a.id===selected?" selected":""}>${esc(a.name)}</option>`).join("");
-const categoryOptions = (selected) => CATEGORIES.map(c => `<option value="${esc(c)}"${c===selected?" selected":""}>${esc(c)}</option>`).join("");
+const categoryOptions = (selected) => CATEGORIES.map(c => `<option value="${esc(c)}"${c===selected?" selected":""}>${c}</option>`).join("");
 const close = () => document.getElementById("modal-root")?.replaceChildren();
 
 function openSingle(data, fileName) {
@@ -42,7 +42,7 @@ function openSingle(data, fileName) {
       <div class="form-field full"><label>Observaciones</label><textarea name="description">${esc(data.notes || `Detectado por BorjaAI · ${data.institution || ""}${data.ticker ? ` · ${data.ticker}` : ""}`)}</textarea></div>
     </div><p class="form-hint">Revisa los datos y confirma. Se sincronizan con Supabase.</p></div><footer class="modal-foot"><button type="button" class="btn" data-ai-close>Cancelar</button><button class="btn btn-primary">Confirmar e incorporar</button></footer></form></section></div>`;
   root.querySelectorAll("[data-ai-close]").forEach(b => b.addEventListener("click", close));
-  setupEuroInput(root.querySelector("[data-euro-input]"), () => amount);
+  setupEuroInput(root.querySelector("[data-euro-input]"));
 }
 
 function openBalance(data, fileName) {
@@ -64,10 +64,10 @@ function openBatch(data, fileName) {
     <td><select data-ai-batch="${i}" data-field="category">${categoryOptions(row.category || "Otros")}</select></td>
     <td><input data-ai-batch="${i}" data-field="notes" placeholder="Añadir observación…" value="${esc(row.notes || "")}"></td>
   </tr>`).join("");
-  rootWithBatch(data, fileName, rows, html);
+  rootWithBatch(fileName, rows, html);
 }
 
-function rootWithBatch(data, fileName, rows, html) {
+function rootWithBatch(fileName, rows, html) {
   const root = document.getElementById("modal-root"); if (!root) return;
   root.innerHTML = `<div class="modal-backdrop"><section class="modal modal-wide" role="dialog" aria-modal="true">
     <header class="modal-head"><div><div class="section-kicker">Importación IA</div><h2>Revisar ${rows.length} movimientos</h2><p>${esc(fileName)} · revisa antes de confirmar.</p></div><button type="button" class="icon-button modal-close" data-ai-close>×</button></header>
@@ -78,14 +78,11 @@ function rootWithBatch(data, fileName, rows, html) {
     <footer class="modal-foot"><button type="button" class="btn" data-ai-close>Cancelar</button><button type="button" class="btn btn-primary" data-ai-batch-confirm>Confirmar ${rows.length} movimientos</button></footer>
   </section></div>`;
   root.querySelectorAll("[data-ai-close]").forEach(b => b.addEventListener("click", close));
-  root.querySelectorAll("[data-euro-input]").forEach(input => setupEuroInput(input, () => {
-    const index = Number(input.dataset.rowIndex);
-    return rows[index]?.amount || 0;
-  }));
-  root.querySelector("[data-ai-batch-confirm]").addEventListener("click", () => confirmBatch(root, rows, data));
+  root.querySelectorAll("[data-euro-input]").forEach(input => setupEuroInput(input));
+  root.querySelector("[data-ai-batch-confirm]").addEventListener("click", () => confirmBatch(root, rows, fileName));
 }
 
-function setupEuroInput(input, getter) {
+function setupEuroInput(input) {
   if (!input) return;
   input.addEventListener("focus", () => {
     const n = parseEuro(input.value);
@@ -104,7 +101,7 @@ async function persistState(mutator) {
   await api.saveState(state);
 }
 
-async function confirmBatch(root, rows, data) {
+async function confirmBatch(root, rows, fileName) {
   const controls = root.querySelectorAll("[data-ai-batch]");
   const edits = rows.map((row,index) => {
     const out = { ...row };
@@ -130,7 +127,7 @@ async function confirmBatch(root, rows, data) {
         ids.push(id);
       });
       state.imports = Array.isArray(state.imports) ? state.imports : [];
-      state.imports.push({ id:`ai-import-${Date.now()}`, fileName:data?.fileName || "Importación IA", createdAt:today(), count:ids.length, ids, sourceType:"image", status:"confirmed", generalNotes });
+      state.imports.push({ id:`ai-import-${Date.now()}`, fileName, createdAt:today(), count:ids.length, ids, sourceType:"image", status:"confirmed", generalNotes });
     });
     close();
     window.location.reload();
