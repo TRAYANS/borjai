@@ -48,10 +48,11 @@ function decorate(root) {
     if (!value) return;
     const label = clean(card.querySelector("span")?.textContent);
     if (label !== "Categoria principal" || card.querySelector(".category-icon")) return;
-    const icon = CATEGORY_ICONS[clean(value.textContent)];
+    const name = clean(value.textContent);
+    const icon = CATEGORY_ICONS[name];
     if (!icon) return;
     value.innerHTML = `<span class="category-summary"><span class="category-icon" aria-hidden="true">${icon}</span><span></span></span>`;
-    value.querySelector(".category-summary > span:last-child").textContent = clean(value.textContent);
+    value.querySelector(".category-summary > span:last-child").textContent = name;
   });
 }
 
@@ -69,4 +70,4 @@ document.head.appendChild(style);
 const observer = new MutationObserver(() => decorate(document.getElementById("app-view")));
 observer.observe(document.documentElement, { childList: true, subtree: true });
 document.addEventListener("DOMContentLoaded", () => decorate(document.getElementById("app-view")));
-de­corate(document.getElementById("app-view"));
+decorate(document.getElementById("app-view"));
