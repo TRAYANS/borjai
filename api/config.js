@@ -14,7 +14,10 @@ export default async function handler(req, res) {
     groq: Boolean(process.env.GROQ_API_KEY)
   };
   const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
-  const serverStateConfigured = Boolean(supabaseConfigured && (hasServiceRole ? hasOwnerId : true));
+  const serverStateConfigured = supabaseConfigured;
+  const serverStateMode = hasServiceRole
+    ? (hasOwnerId ? "service_role_owner" : "service_role_discovered_owner")
+    : "rls_user";
 
   res.setHeader("Cache-Control", "no-store, max-age=0");
   return res.status(200).json({
@@ -27,7 +30,7 @@ export default async function handler(req, res) {
     serverState: {
       serviceRoleConfigured: hasServiceRole,
       ownerIdConfigured: hasOwnerId,
-      mode: hasServiceRole && hasOwnerId ? "service_role_owner" : "rls_user"
+      mode: serverStateMode
     },
     groqConfigured: configured.groq,
     aiCouncil: {
