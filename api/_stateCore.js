@@ -182,11 +182,12 @@ export function createConfiguredClient(req) {
   if (!url || !anonKey) throw new Error("Supabase no está configurado.");
 
   const ownerId = process.env.BORJAI_OWNER_ID || "";
-  if (serviceKey && ownerId) {
+  if (serviceKey) {
     return {
       client: createRestClient(url, serviceKey, serviceKey),
-      userId: ownerId,
-      mode: "service_role_owner"
+      userId: ownerId || null,
+      serviceRole: true,
+      mode: ownerId ? "service_role_owner" : "service_role_discovered_owner"
     };
   }
 
@@ -195,12 +196,27 @@ export function createConfiguredClient(req) {
   return {
     client: createRestClient(url, anonKey, token),
     token,
+    serviceRole: false,
     mode: "rls_user"
   };
 }
 
 export async function resolveUser(context) {
   if (context.userId) return context.userId;
+
+  if (context.serviceRole) {
+    for (const table of TABLES) {
+      const result = await context.client.from(table).select("user_id").order("created_at", { ascending: true });
+      if (result.error) continue;
+      const candidate = (result.data || []).find((row) => row.user_id);
+      if (candidate?.user_id) {
+        context.userId = candidate.user_id;
+        return context.userId;
+      }
+    }
+    throw new Error("No se encontró un usuario propietario con datos financieros.");
+  }
+
   const result = await context.client.auth.getUser(context.token);
   if (result.error || !result.data?.user?.id) throw new Error("Sesión de BorjaAI no válida.");
   context.userId = result.data.user.id;
