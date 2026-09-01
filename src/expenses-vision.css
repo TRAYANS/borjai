@@ -1,111 +1,137 @@
-/* BorjaAI · Gastos · visual pass matching the approved dark/red dashboard */
+/* BorjaAI · Gastos · exact visual pass based on approved September 2026 reference */
 .expenses-redesign {
-  --expense-red: #ff2638;
-  --expense-panel: #0f1217;
-  --expense-line: #252a31;
-  --expense-muted: #8f96a1;
-  max-width: 100%;
+  --expense-red:#ff2638;
+  --expense-panel:#0b0e13;
+  --expense-line:#29303a;
+  --expense-muted:#9299a5;
+  width:100%;
+  max-width:none;
 }
 
-.expenses-redesign .expense-redesign-head { margin-bottom: 20px; }
+/* Header */
+.expenses-redesign .expense-redesign-head{margin:0 0 16px;align-items:flex-end;}
 .expenses-redesign .expense-redesign-head .section-kicker,
-.expenses-redesign .expense-insight-panel .section-kicker { color: var(--expense-red); }
-.expenses-redesign .expense-summary-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
-.expenses-redesign .expense-kpi { min-width: 0; min-height: 106px; padding: 14px 13px; gap: 13px; border-color: var(--expense-line); border-radius: 12px; background: linear-gradient(145deg, #101318, #0d1014); }
-.expenses-redesign .expense-kpi-icon { width: 54px; height: 54px; flex: 0 0 54px; border-color: var(--expense-red); background: #090b0f; box-shadow: inset 0 0 0 1px rgba(255,38,56,.06), 0 0 22px rgba(255,38,56,.05); }
-.expenses-redesign .expense-kpi-icon .expense-icon { width: 27px; height: 27px; }
-.expenses-redesign .expense-kpi span { margin-bottom: 5px; font-size: 10px; letter-spacing: .11em; }
-.expenses-redesign .expense-kpi strong { font-size: 21px; letter-spacing: -.01em; }
-.expenses-redesign .expense-kpi small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.expenses-redesign .expense-main-grid { grid-template-columns: minmax(0, 1fr) 350px; gap: 14px; margin-top: 14px; align-items: stretch; }
+.expenses-redesign .expense-insight-panel .section-kicker{color:#ff2638;}
+.expenses-redesign .expense-redesign-head h1{margin:3px 0 4px;font-size:24px;line-height:1.05;letter-spacing:-.025em;}
+.expenses-redesign .expense-redesign-head p{margin:0;font-size:12px;color:#9ba1ab;}
+.expenses-redesign .view-head-actions .btn-primary{height:34px;padding:0 16px;border-radius:7px;font-weight:700;}
+.expenses-redesign .expense-action-icon{font-size:20px;line-height:1;margin-right:5px;}
+
+/* Five KPI cards */
+.expenses-redesign .expense-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-top:0;}
+.expenses-redesign .expense-kpi{min-width:0;height:112px;box-sizing:border-box;padding:15px 13px;border:1px solid #29303a;border-radius:10px;background:linear-gradient(145deg,#0e1218,#0a0d12);display:flex;align-items:center;gap:11px;}
+.expenses-redesign .expense-kpi:nth-child(1){border-color:rgba(255,38,56,.5);}
+.expenses-redesign .expense-kpi:nth-child(2){border-color:rgba(34,197,94,.42);}
+.expenses-redesign .expense-kpi:nth-child(3){border-color:rgba(59,130,246,.48);}
+.expenses-redesign .expense-kpi:nth-child(4){border-color:rgba(168,85,247,.48);}
+.expenses-redesign .expense-kpi:nth-child(5){border-color:rgba(245,158,11,.55);}
+.expenses-redesign .expense-kpi-icon{width:48px;height:48px;flex:0 0 48px;border-radius:50%;display:grid;place-items:center;border:0;box-shadow:0 8px 24px rgba(0,0,0,.28);}
+.expenses-redesign .expense-kpi:nth-child(1) .expense-kpi-icon{background:#ff2638;color:#fff;}
+.expenses-redesign .expense-kpi:nth-child(2) .expense-kpi-icon{background:#16b94f;color:#fff;}
+.expenses-redesign .expense-kpi:nth-child(3) .expense-kpi-icon{background:#2477df;color:#fff;}
+.expenses-redesign .expense-kpi:nth-child(4) .expense-kpi-icon{background:#9947df;color:#fff;}
+.expenses-redesign .expense-kpi:nth-child(5) .expense-kpi-icon{background:#f59e0b;color:#fff;}
+.expenses-redesign .expense-kpi-icon .expense-icon{width:24px;height:24px;stroke:currentColor;}
+.expenses-redesign .expense-kpi>div:last-child{min-width:0;display:flex;flex-direction:column;}
+.expenses-redesign .expense-kpi span{margin:0 0 4px;font-size:9px;line-height:1.1;font-weight:800;letter-spacing:.12em;color:#aeb4be;white-space:nowrap;}
+.expenses-redesign .expense-kpi strong{font-size:18px;line-height:1.12;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.expenses-redesign .expense-kpi small{margin-top:5px;font-size:10px;color:#a1a7b1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* Main two-column area */
+.expenses-redesign .expense-main-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(370px,1fr);gap:13px;margin-top:13px;align-items:stretch;}
 .expenses-redesign .expense-category-panel,
-.expenses-redesign .expense-insight-panel { min-width: 0; min-height: 0; border-color: var(--expense-line); background: radial-gradient(circle at 20% 15%, rgba(255,38,56,.035), transparent 34%), #0f1217; }
-.expenses-redesign .expense-category-panel { overflow: hidden; }
-.expenses-redesign .expense-chart-content { display: grid; grid-template-columns: minmax(300px, 43%) minmax(0, 57%); align-items: center; min-height: 430px; gap: 0; }
-.expenses-redesign .expense-donut-wrap { width: 300px; height: 300px; margin: 0 auto; }
-.expenses-redesign .expense-donut-svg { width: 300px; height: 300px; filter: drop-shadow(0 12px 24px rgba(0,0,0,.2)); }
-.expenses-redesign .expense-donut-segment { stroke: #0c0f13; stroke-width: 1.4; paint-order: stroke fill; }
-.expenses-redesign .expense-donut-center strong { font-size: 25px; letter-spacing: -.02em; }
-.expenses-redesign .expense-donut-center span { font-size: 12px; }
-.expenses-redesign .expense-category-list { min-width: 0; max-height: 420px; overflow-y: auto; padding: 4px 18px 8px 4px; scrollbar-width: thin; scrollbar-color: #343943 transparent; }
-.expenses-redesign .expense-category-row { min-height: 30px; grid-template-columns: minmax(0, 1fr) 82px 38px; gap: 7px; padding: 4px 5px; border-bottom-color: #20242b; border-radius: 5px; }
-.expenses-redesign .expense-category-row:hover,
-.expenses-redesign .expense-category-row.is-active { background: rgba(255,38,56,.07); }
-.expenses-redesign .expense-category-name { min-width: 0; gap: 8px; font-size: 13.5px; }
-.expenses-redesign .expense-category-name > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.expenses-redesign .expense-category-row strong { font-size: 13px; }
-.expenses-redesign .expense-category-pct { font-size: 12px; }
-.expenses-redesign .expense-category-row .expense-icon { width: 19px; height: 19px; }
-.expenses-redesign .expense-all-categories { min-height: 34px; margin-top: 9px; border-color: #30343b; background: transparent; color: #f3f4f5; }
-.expenses-redesign .expense-insight-panel { padding: 21px 20px; }
-.expenses-redesign .expense-insight-panel .panel-title { margin-top: 5px; font-size: 19px; }
-.expenses-redesign .expense-insight-panel > p { margin: 18px 0 12px; line-height: 1.55; }
-.expenses-redesign .expense-insight-row { min-height: 54px; padding: 12px 0; border-bottom-color: #24282f; font-size: 13px; }
-.expenses-redesign .expense-insight-panel .btn { min-height: 36px; margin-top: 16px; border-color: var(--expense-red); background: transparent; color: var(--expense-red); }
-.expenses-redesign .expense-insight-panel .btn:hover { background: rgba(255,38,56,.08); }
-.expenses-redesign .expense-recent-panel { margin-top: 14px; overflow: hidden; border-color: var(--expense-line); background: #0f1217; }
-.expenses-redesign .expense-recent-panel .table-toolbar { min-height: 62px; padding: 0 18px; }
-.expenses-redesign .expense-recent-panel .data-table th { font-size: 10px; letter-spacing: .08em; }
-.expenses-redesign .expense-recent-panel .data-table td { padding-top: 10px; padding-bottom: 10px; font-size: 13px; }
-.expenses-redesign .expense-table-category .expense-icon { color: var(--expense-red); stroke: currentColor; }
-.expenses-redesign .expense-table-empty { min-height: 120px; height: 120px; }
+.expenses-redesign .expense-insight-panel{min-width:0;height:395px;box-sizing:border-box;border:1px solid #29303a;border-radius:11px;background:radial-gradient(circle at 18% 18%,rgba(255,38,56,.035),transparent 34%),#0b0e13;overflow:hidden;}
+.expenses-redesign .expense-category-panel{padding:0 17px;}
+.expenses-redesign .expense-category-panel .panel-head{height:59px;display:flex;align-items:center;padding:0;}
+.expenses-redesign .expense-category-panel .panel-title{margin:0 0 4px;font-size:16px;line-height:1.1;}
+.expenses-redesign .expense-category-panel .panel-note{font-size:10px;color:#9ca3ad;text-transform:none;}
 
-/* Category palette: distinct, readable accents matching the approved reference. */
-.expenses-redesign .expense-donut-segment[data-category="Restaurantes"] { fill: #ff2638 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Vivienda"] { fill: #3b82f6 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Inversiones"] { fill: #22c55e !important; }
-.expenses-redesign .expense-donut-segment[data-category="Viajes"] { fill: #a855f7 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Gasolina"] { fill: #f97316 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Alimentacion"] { fill: #14b8a6 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Compras"] { fill: #ec4899 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Tecnologia"] { fill: #eab308 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Formacion"] { fill: #8b5cf6 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Impuestos"] { fill: #84cc16 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Transporte"] { fill: #06b6d4 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Salud"] { fill: #f43f5e !important; }
-.expenses-redesign .expense-donut-segment[data-category="Seguros"] { fill: #2563eb !important; }
-.expenses-redesign .expense-donut-segment[data-category="Ocio"] { fill: #f59e0b !important; }
-.expenses-redesign .expense-donut-segment[data-category="Suscripciones"] { fill: #9333ea !important; }
-.expenses-redesign .expense-donut-segment[data-category="Criptomonedas"] { fill: #0ea5a8 !important; }
-.expenses-redesign .expense-donut-segment[data-category="Otros"] { fill: #6b7280 !important; }
+/* Chart: donut on the left, compact category legend on the right */
+.expenses-redesign .expense-chart-content{height:336px;min-height:336px;display:grid;grid-template-columns:43% 57%;align-items:center;gap:0;}
+.expenses-redesign .expense-donut-wrap{position:relative;width:245px;height:245px;margin:0 auto;display:grid;place-items:center;}
+.expenses-redesign .expense-donut{position:relative;width:245px;height:245px;display:grid;place-items:center;}
+.expenses-redesign .expense-donut-svg{width:245px;height:245px;filter:drop-shadow(0 10px 20px rgba(0,0,0,.25));}
+.expenses-redesign .expense-donut-segment{stroke:#0b0e13;stroke-width:1.3;paint-order:stroke fill;}
+.expenses-redesign .expense-donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;pointer-events:none;}
+.expenses-redesign .expense-donut-center strong{font-size:19px;line-height:1.1;letter-spacing:-.02em;}
+.expenses-redesign .expense-donut-center span{margin-top:5px;font-size:11px;color:#969da8;}
 
-/* The same palette follows the category icon in the list and recent movements. */
-.expenses-redesign [data-category-row="Restaurantes"] .expense-icon,
-.expenses-redesign .expense-table-category:has(.expense-icon) { stroke: currentColor; }
-.expenses-redesign [data-category-row="Restaurantes"] .expense-icon { color:#ff2638; }
-.expenses-redesign [data-category-row="Vivienda"] .expense-icon { color:#3b82f6; }
-.expenses-redesign [data-category-row="Inversiones"] .expense-icon { color:#22c55e; }
-.expenses-redesign [data-category-row="Viajes"] .expense-icon { color:#a855f7; }
-.expenses-redesign [data-category-row="Gasolina"] .expense-icon { color:#f97316; }
-.expenses-redesign [data-category-row="Alimentacion"] .expense-icon { color:#14b8a6; }
-.expenses-redesign [data-category-row="Compras"] .expense-icon { color:#ec4899; }
-.expenses-redesign [data-category-row="Tecnologia"] .expense-icon { color:#eab308; }
-.expenses-redesign [data-category-row="Formacion"] .expense-icon { color:#8b5cf6; }
-.expenses-redesign [data-category-row="Impuestos"] .expense-icon { color:#84cc16; }
-.expenses-redesign [data-category-row="Transporte"] .expense-icon { color:#06b6d4; }
-.expenses-redesign [data-category-row="Salud"] .expense-icon { color:#f43f5e; }
-.expenses-redesign [data-category-row="Seguros"] .expense-icon { color:#2563eb; }
-.expenses-redesign [data-category-row="Ocio"] .expense-icon { color:#f59e0b; }
-.expenses-redesign [data-category-row="Suscripciones"] .expense-icon { color:#9333ea; }
-.expenses-redesign [data-category-row="Criptomonedas"] .expense-icon { color:#0ea5a8; }
-.expenses-redesign [data-category-row="Otros"] .expense-icon { color:#9ca3af; }
+/* Category colors */
+.expenses-redesign .expense-donut-segment[data-category="Restaurantes"]{fill:#ff2638!important;}
+.expenses-redesign .expense-donut-segment[data-category="Vivienda"]{fill:#3b82f6!important;}
+.expenses-redesign .expense-donut-segment[data-category="Inversiones"]{fill:#22c55e!important;}
+.expenses-redesign .expense-donut-segment[data-category="Viajes"]{fill:#a855f7!important;}
+.expenses-redesign .expense-donut-segment[data-category="Gasolina"]{fill:#f97316!important;}
+.expenses-redesign .expense-donut-segment[data-category="Alimentacion"]{fill:#14b8a6!important;}
+.expenses-redesign .expense-donut-segment[data-category="Compras"]{fill:#ec4899!important;}
+.expenses-redesign .expense-donut-segment[data-category="Tecnologia"]{fill:#eab308!important;}
+.expenses-redesign .expense-donut-segment[data-category="Formacion"]{fill:#8b5cf6!important;}
+.expenses-redesign .expense-donut-segment[data-category="Impuestos"]{fill:#84cc16!important;}
+.expenses-redesign .expense-donut-segment[data-category="Transporte"]{fill:#06b6d4!important;}
+.expenses-redesign .expense-donut-segment[data-category="Salud"]{fill:#f43f7e!important;}
+.expenses-redesign .expense-donut-segment[data-category="Seguros"]{fill:#2563eb!important;}
+.expenses-redesign .expense-donut-segment[data-category="Ocio"]{fill:#f59e0b!important;}
+.expenses-redesign .expense-donut-segment[data-category="Suscripciones"]{fill:#9333ea!important;}
+.expenses-redesign .expense-donut-segment[data-category="Criptomonedas"]{fill:#0ea5a8!important;}
+.expenses-redesign .expense-donut-segment[data-category="Otros"]{fill:#6b7280!important;}
 
-@media (max-width: 1250px) {
-  .expenses-redesign .expense-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .expenses-redesign .expense-main-grid { grid-template-columns: minmax(0, 1fr) 320px; }
-  .expenses-redesign .expense-chart-content { grid-template-columns: minmax(270px, 40%) minmax(0, 60%); }
-  .expenses-redesign .expense-donut-wrap,
-  .expenses-redesign .expense-donut-svg { width: 260px; height: 260px; }
+/* Legend */
+.expenses-redesign .expense-category-list{min-width:0;height:322px;max-height:322px;overflow-y:auto;padding:0 3px 0 7px;scrollbar-width:thin;scrollbar-color:#333944 transparent;}
+.expenses-redesign .expense-category-row{width:100%;min-height:21px;height:21px;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) 75px 40px;gap:5px;padding:0 3px;border:0;border-bottom:1px solid rgba(255,255,255,.055);border-radius:3px;background:transparent;text-align:left;}
+.expenses-redesign .expense-category-row:hover,.expenses-redesign .expense-category-row.is-active{background:rgba(255,38,56,.07);}
+.expenses-redesign .expense-category-name{min-width:0;display:flex;align-items:center;gap:7px;font-size:12px;color:#f0f2f5;}
+.expenses-redesign .expense-category-name>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.expenses-redesign .expense-category-row strong{font-size:12px;line-height:21px;text-align:right;color:#f2f3f5;font-weight:700;}
+.expenses-redesign .expense-category-pct{font-size:11px;line-height:21px;text-align:right;color:#9299a4;}
+.expenses-redesign .expense-category-row .expense-icon{width:16px;height:16px;flex:0 0 16px;stroke:currentColor;}
+.expenses-redesign [data-category-row="Restaurantes"] .expense-icon{color:#ff2638;}
+.expenses-redesign [data-category-row="Vivienda"] .expense-icon{color:#3b82f6;}
+.expenses-redesign [data-category-row="Inversiones"] .expense-icon{color:#22c55e;}
+.expenses-redesign [data-category-row="Viajes"] .expense-icon{color:#a855f7;}
+.expenses-redesign [data-category-row="Gasolina"] .expense-icon{color:#f97316;}
+.expenses-redesign [data-category-row="Alimentacion"] .expense-icon{color:#14b8a6;}
+.expenses-redesign [data-category-row="Compras"] .expense-icon{color:#ec4899;}
+.expenses-redesign [data-category-row="Tecnologia"] .expense-icon{color:#eab308;}
+.expenses-redesign [data-category-row="Formacion"] .expense-icon{color:#8b5cf6;}
+.expenses-redesign [data-category-row="Impuestos"] .expense-icon{color:#84cc16;}
+.expenses-redesign [data-category-row="Transporte"] .expense-icon{color:#06b6d4;}
+.expenses-redesign [data-category-row="Salud"] .expense-icon{color:#f43f7e;}
+.expenses-redesign [data-category-row="Seguros"] .expense-icon{color:#2563eb;}
+.expenses-redesign [data-category-row="Ocio"] .expense-icon{color:#f59e0b;}
+.expenses-redesign [data-category-row="Suscripciones"] .expense-icon{color:#9333ea;}
+.expenses-redesign [data-category-row="Criptomonedas"] .expense-icon{color:#0ea5a8;}
+.expenses-redesign [data-category-row="Otros"] .expense-icon{color:#9ca3af;}
+.expenses-redesign .expense-all-categories{width:100%;height:32px;min-height:32px;margin-top:7px;border:1px solid #2d333d;border-radius:6px;background:transparent;color:#e9ebee;font-size:11px;}
+
+/* Insight panel */
+.expenses-redesign .expense-insight-panel{padding:17px 17px;}
+.expenses-redesign .expense-insight-panel .panel-title{margin:4px 0 0;font-size:17px;line-height:1.15;}
+.expenses-redesign .expense-insight-panel>p{margin:17px 0 9px;font-size:11px;line-height:1.45;color:#9ca3ad;}
+.expenses-redesign .expense-insight-row{min-height:63px;padding:11px 0;border-bottom:1px solid #242a32;font-size:12px;}
+.expenses-redesign .expense-insight-panel .btn{width:100%;height:31px;min-height:31px;margin-top:12px;border:1px solid #ff2638;border-radius:6px;background:transparent;color:#ff2638;font-size:11px;}
+.expenses-redesign .expense-insight-panel .btn:hover{background:rgba(255,38,56,.08);}
+
+/* Recent movements */
+.expenses-redesign .expense-recent-panel{margin-top:13px;min-height:279px;overflow:hidden;border:1px solid #29303a;border-radius:11px;background:#0b0e13;}
+.expenses-redesign .expense-recent-panel .table-toolbar{min-height:58px;height:58px;padding:0 17px;}
+.expenses-redesign .expense-recent-panel .data-table th{font-size:9px;letter-spacing:.09em;color:#9299a4;}
+.expenses-redesign .expense-recent-panel .data-table td{padding-top:9px;padding-bottom:9px;font-size:12px;}
+.expenses-redesign .expense-table-category{display:inline-flex;align-items:center;gap:7px;}
+.expenses-redesign .expense-table-category .expense-icon{width:16px;height:16px;stroke:currentColor;}
+.expenses-redesign .expense-table-empty{min-height:100px;height:100px;}
+
+@media (max-width:1250px){
+  .expenses-redesign .expense-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .expenses-redesign .expense-main-grid{grid-template-columns:minmax(0,1fr) 350px;}
 }
-@media (max-width: 1050px) {
-  .expenses-redesign .expense-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .expenses-redesign .expense-main-grid { grid-template-columns: 1fr; }
-  .expenses-redesign .expense-chart-content { grid-template-columns: 44% 56%; min-height: 410px; }
+@media (max-width:1050px){
+  .expenses-redesign .expense-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .expenses-redesign .expense-main-grid{grid-template-columns:1fr;}
+  .expenses-redesign .expense-category-panel,.expenses-redesign .expense-insight-panel{height:auto;min-height:395px;}
 }
-@media (max-width: 720px) {
-  .expenses-redesign .expense-summary-grid { grid-template-columns: 1fr; }
-  .expenses-redesign .expense-chart-content { grid-template-columns: 1fr; padding-bottom: 14px; }
-  .expenses-redesign .expense-category-list { max-height: none; overflow: visible; padding: 0 12px 8px; }
-  .expenses-redesign .expense-donut-wrap,
-  .expenses-redesign .expense-donut-svg { width: 235px; height: 235px; }
+@media (max-width:720px){
+  .expenses-redesign .expense-summary-grid{grid-template-columns:1fr;}
+  .expenses-redesign .expense-chart-content{grid-template-columns:1fr;height:auto;padding:12px 0 18px;}
+  .expenses-redesign .expense-donut-wrap,.expenses-redesign .expense-donut,.expenses-redesign .expense-donut-svg{width:235px;height:235px;}
+  .expenses-redesign .expense-category-list{height:auto;max-height:none;overflow:visible;padding:10px 0 0;}
 }
