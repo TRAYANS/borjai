@@ -4,6 +4,6 @@
   const link = document.createElement('link');
   link.id = 'borjai-expenses-vision-css';
   link.rel = 'stylesheet';
-  link.href = 'src/expenses-vision.css?v=1.8.7';
+  link.href = 'src/expenses-vision.css?v=1.8.8';
   document.head.appendChild(link);
 })();
