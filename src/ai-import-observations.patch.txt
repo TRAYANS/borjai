@@ -1,9 +1,0 @@
-IMPLEMENTATION NOTE
-Add euro formatting and observations to the AI import review modal.
-
-Required UI:
-- Amount inputs display localized euro values, e.g. -600,00 €, -45,12 €, -3,10 €, -0,45 €.
-- Preserve numeric value for persistence; euro suffix is presentation only.
-- Add per-movement Observaciones field.
-- Add optional Observaciones generales textarea below the movement table.
-- Preserve existing Cancel/Confirm actions and responsive behavior.
