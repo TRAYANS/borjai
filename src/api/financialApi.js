@@ -84,10 +84,7 @@ export async function createFinancialApi(options) {
   }
 
   async function connectServerApi() {
-    const repo = createServerApiRepository({
-      baseUrl: config.apiBaseUrl || "",
-      getAccessToken
-    });
+    const repo = createServerApiRepository({ baseUrl: config.apiBaseUrl || "", getAccessToken });
     await repo.health();
     activeRepository = repo;
     backendStatus = { mode: "api", connected: true, error: "" };
@@ -114,11 +111,7 @@ export async function createFinancialApi(options) {
   try {
     await connectBackend();
   } catch (e) {
-    backendStatus = {
-      mode: localDevelopmentMode ? "local" : "unavailable",
-      connected: false,
-      error: e.message || "No se pudo conectar con Supabase."
-    };
+    backendStatus = { mode: localDevelopmentMode ? "local" : "unavailable", connected: false, error: e.message || "No se pudo conectar con Supabase." };
     if (localDevelopmentMode) activeRepository = localRepository;
   }
 
@@ -131,40 +124,18 @@ export async function createFinancialApi(options) {
     try {
       const remote = await loadFromBackend();
       backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
-      const localState = localRepository.readRaw();
-      const validation = validateLegacyState(localState);
-      if (validation.ok) {
-        const localNormalized = normalizeState(localState, fallbackFactory);
-        const remoteCounts = stateCounts(remote);
-        const localCounts = stateCounts(localNormalized);
-        const localHasNewerData =
-          localCounts.transactions > remoteCounts.transactions ||
-          localCounts.accounts > remoteCounts.accounts ||
-          localCounts.assets > remoteCounts.assets ||
-          localCounts.goals > remoteCounts.goals ||
-          localCounts.imports > remoteCounts.imports ||
-          localCounts.wealthSnapshots > remoteCounts.wealthSnapshots;
-        if (localHasNewerData) {
-          localRepository.backup(LOCAL_BACKUP_KEY);
-          await activeRepository.migrateFromLocal(localNormalized);
-          const reconciled = await activeRepository.load();
-          localRepository.setMigrationStatus(MIGRATION_STATUS_KEY, { ok: true, reason: "reconciled_local_changes", before: localCounts, after: stateCounts(reconciled), createdAt: new Date().toISOString() });
-          const ensured = ensureDailySnapshot(reconciled);
-          await localRepository.saveState(ensured.state);
-          if (ensured.changed) await activeRepository.saveState(ensured.state);
-          return ensured.state;
-        }
-      }
+
+      // In production, Supabase is the source of truth. Do NOT automatically
+      // migrate stale localStorage data back into the backend: an old browser
+      // cache could otherwise resurrect deleted financial data after a reset.
+      // Local migration remains available only through the explicit migration
+      // action below.
       const ensured = ensureDailySnapshot(remote);
       await localRepository.saveState(ensured.state);
       if (ensured.changed) await activeRepository.saveState(ensured.state);
       return ensured.state;
     } catch (e) {
-      backendStatus = {
-        mode: localDevelopmentMode ? "local" : "unavailable",
-        connected: false,
-        error: e.message || "Backend no disponible."
-      };
+      backendStatus = { mode: localDevelopmentMode ? "local" : "unavailable", connected: false, error: e.message || "Backend no disponible." };
       if (localDevelopmentMode) {
         activeRepository = localRepository;
         return localRepository.load();
@@ -190,11 +161,7 @@ export async function createFinancialApi(options) {
       backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
       return saved;
     } catch (e) {
-      backendStatus = {
-        mode: localDevelopmentMode ? "local" : "unavailable",
-        connected: false,
-        error: e.message || "No se pudo guardar en Supabase."
-      };
+      backendStatus = { mode: localDevelopmentMode ? "local" : "unavailable", connected: false, error: e.message || "No se pudo guardar en Supabase." };
       if (localDevelopmentMode) {
         await localRepository.saveState(normalized);
         return normalized;
@@ -211,11 +178,7 @@ export async function createFinancialApi(options) {
       backendStatus = { mode: statusMode(activeRepository), connected: activeRepository.kind !== "local", error: "" };
       return next;
     } catch (e) {
-      backendStatus = {
-        mode: localDevelopmentMode ? "local" : "unavailable",
-        connected: false,
-        error: e.message || "No se pudo restablecer en backend."
-      };
+      backendStatus = { mode: localDevelopmentMode ? "local" : "unavailable", connected: false, error: e.message || "No se pudo restablecer en backend." };
       if (localDevelopmentMode) return localRepository.reset();
       throw e;
     }
@@ -234,11 +197,7 @@ export async function createFinancialApi(options) {
       localRepository.setMigrationStatus(MIGRATION_STATUS_KEY, status);
       return status;
     } catch (e) {
-      backendStatus = {
-        mode: localDevelopmentMode ? "local" : "unavailable",
-        connected: false,
-        error: e.message || "No se pudo migrar al backend."
-      };
+      backendStatus = { mode: localDevelopmentMode ? "local" : "unavailable", connected: false, error: e.message || "No se pudo migrar al backend." };
       const status = { ok: false, reason: "backend_unavailable", counts: stateCounts(localState), createdAt: new Date().toISOString(), error: backendStatus.error };
       localRepository.setMigrationStatus(MIGRATION_STATUS_KEY, status);
       return status;
