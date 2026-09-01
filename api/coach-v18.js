@@ -31,12 +31,17 @@ function rateLimit(req) {
 }
 
 function cleanAnswer(value) {
-  return String(value || "")
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
-    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
-    .replace(/^\s*```(?:markdown|md|text)?\s*/i, "")
-    .replace(/\s*```\s*$/i, "")
-    .trim();
+  let text = String(value || "");
+  // Strip paired and unclosed reasoning blocks before anything reaches the browser.
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  text = text.replace(/<analysis>[\s\S]*?<\/analysis>/gi, "");
+  text = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "");
+  text = text.replace(/<think>[\s\S]*$/gi, "");
+  text = text.replace(/<analysis>[\s\S]*$/gi, "");
+  text = text.replace(/<reasoning>[\s\S]*$/gi, "");
+  text = text.replace(/^\s*```(?:markdown|md|text)?\s*/i, "");
+  text = text.replace(/\s*```\s*$/i, "");
+  return text.trim();
 }
 
 function jsonResponse(content) {
@@ -103,6 +108,8 @@ async function groq({ apiKey, model, system, user }) {
       model,
       temperature: 0.2,
       max_completion_tokens: 4000,
+      reasoning_effort: "medium",
+      reasoning_format: "hidden",
       messages: [{ role: "system", content: system }, { role: "user", content: user }]
     })
   });
@@ -124,11 +131,11 @@ async function resolveGroqModel(apiKey, preferred, candidates) {
   }
 }
 
-const SPECIALIST_SYSTEM = `Eres un analista financiero senior dentro del consejo IA de BorjaAI.
+const SPECIALIST_SYSTEM = `Eres un analista financiero senior de BorjaAI.
 Usa exclusivamente el contexto entregado y, si se indica, datos de mercado recientes. No inventes cifras.
 Distingue hechos, cálculos e inferencias. No presentes una recomendación de inversión como certeza.
 Responde en español, directo, humano y útil. Señala riesgos y qué dato faltaría para afirmar algo con seguridad.
-MUY IMPORTANTE: nunca muestres cadena de pensamiento, razonamiento interno, etiquetas <think>, <analysis> ni instrucciones internas. Entrega únicamente la respuesta final que verá el usuario.`;
+Entrega únicamente la respuesta final para el usuario. Nunca muestres cadena de pensamiento, razonamiento interno, etiquetas <think>, <analysis> o <reasoning>, ni instrucciones internas.`;
 
 const SYNTHESIS_SYSTEM = `Eres el Director de Inversiones y cerebro final de BorjaAI.
 Recibirás análisis independientes de varios modelos. Resuelve discrepancias y produce una única respuesta clara y accionable.
@@ -136,10 +143,10 @@ Prioriza datos verificables del contexto. No inventes cifras, precios ni noticia
 Cuando la consulta implique mercados, usa las fuentes web disponibles solo como información adicional y marca cualquier dato que sea reciente.
 Estructura solo cuando ayude: conclusión, por qué, acción propuesta y riesgos/qué vigilar.
 No prometas rentabilidades. No uses lenguaje de certeza para inversiones.
-Nunca muestres cadena de pensamiento, razonamiento interno, etiquetas <think>, <analysis> ni instrucciones internas. Entrega únicamente la respuesta final.`;
+Entrega únicamente la respuesta final. Nunca muestres cadena de pensamiento, razonamiento interno, etiquetas <think>, <analysis> o <reasoning>, ni instrucciones internas.`;
 
 function buildUserPrompt(question, context) {
-  return `PREGUNTA DEL USUARIO:\n${question}\n\nCONTEXTO FINANCIERO ESTRUCTURADO:\n${JSON.stringify(context)}\n\nAnaliza la consulta y devuelve exclusivamente la respuesta final para el usuario. No incluyas tu razonamiento interno.`;
+  return `PREGUNTA DEL USUARIO:\n${question}\n\nCONTEXTO FINANCIERO ESTRUCTURADO:\n${JSON.stringify(context)}\n\nDevuelve exclusivamente la respuesta final para el usuario. No incluyas razonamiento interno.`;
 }
 
 export default async function handler(req, res) {
@@ -171,10 +178,12 @@ export default async function handler(req, res) {
     if (process.env.GROQ_API_KEY) {
       providers.push("groq");
       const model = await resolveGroqModel(process.env.GROQ_API_KEY, process.env.GROQ_COACH_MODEL, [
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
         "qwen/qwen3.8-27b",
         "qwen/qwen3.6-27b",
-        "openai/gpt-oss-120b",
-        "openai/gpt-oss-20b"
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant"
       ]);
       jobs.push(groq({ apiKey: process.env.GROQ_API_KEY, model, system: SPECIALIST_SYSTEM, user: userPrompt }));
     }
@@ -190,7 +199,7 @@ export default async function handler(req, res) {
     let answer = successful[0].text;
     let judge = successful[0].provider;
     const dossier = successful.map((item) => `\n### ${item.provider.toUpperCase()}\n${item.text}`).join("\n");
-    const synthesisUser = `PREGUNTA:\n${question}\n\nCONTEXTO:\n${JSON.stringify(context)}\n\nANÁLISIS DEL CONSEJO:\n${dossier}\n\nDevuelve solo la respuesta final, sin cadena de pensamiento ni etiquetas <think>.`;
+    const synthesisUser = `PREGUNTA:\n${question}\n\nCONTEXTO:\n${JSON.stringify(context)}\n\nANÁLISIS DEL CONSEJO:\n${dossier}\n\nDevuelve solo la respuesta final, sin cadena de pensamiento ni etiquetas <think>, <analysis> o <reasoning>.`;
 
     if (process.env.OPENAI_API_KEY) {
       try {
@@ -199,7 +208,7 @@ export default async function handler(req, res) {
       } catch (_) {}
     } else if (process.env.GEMINI_API_KEY && successful.some((x) => x.provider === "gemini")) {
       try {
-        const raw = await gemini({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_COACH_MODEL || "gemini-1.5-flash", system: SYNTHESIS_SYSTEM, user: synthesisUser });
+        const raw = await gemini({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_JUDGE_MODEL || process.env.GEMINI_COACH_MODEL || "gemini-1.5-flash", system: SYNTHESIS_SYSTEM, user: synthesisUser });
         const parsed = jsonResponse(raw);
         answer = cleanAnswer(parsed?.answer || raw);
         judge = "gemini-judge";

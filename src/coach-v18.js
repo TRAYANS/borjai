@@ -31,8 +31,16 @@ function saveMessages(messages) {
 
 function cleanAnswer(value) {
   let text = String(value || "");
+  // Never expose model reasoning, even when the provider forgets to close the tag.
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
   text = text.replace(/<analysis>[\s\S]*?<\/analysis>/gi, "");
+  text = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "");
+  text = text.replace(/<think>[\s\S]*$/gi, "");
+  text = text.replace(/<analysis>[\s\S]*$/gi, "");
+  text = text.replace(/<reasoning>[\s\S]*$/gi, "");
+  text = text.replace(/^[\s\S]*<\/think>/gi, "");
+  text = text.replace(/^[\s\S]*<\/analysis>/gi, "");
+  text = text.replace(/^[\s\S]*<\/reasoning>/gi, "");
   text = text.replace(/^\s*```(?:markdown|md|text)?\s*/i, "");
   text = text.replace(/\s*```\s*$/i, "");
   return text.trim();
