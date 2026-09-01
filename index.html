@@ -6,12 +6,34 @@
   <meta name="theme-color" content="#090a0d">
   <meta name="description" content="BorjaAI, asistente financiero personal con analisis contextual.">
   <title>BorjaAI | Tu asistente financiero</title>
-  <link rel="stylesheet" href="styles.css?v=1.8.2">
-  <link rel="stylesheet" href="src/coach-v18.css?v=1.8.2">
+  <link rel="stylesheet" href="styles.css?v=1.8.3">
+  <link rel="stylesheet" href="src/coach-v18.css?v=1.8.3">
 </head>
 <body>
-  <div id="borjai-auth-loading" style="min-height:100vh;background:#090a0d"></div>
-  <script src="supabase-config.js?v=1.8.2"></script>
-  <script type="module" src="src/auth-gate.js?v=1.8.2"></script>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navegacion principal">
+      <a class="wordmark" href="#inicio" data-view="inicio" aria-label="BorjaAI, inicio"><span class="wordmark-mark">B</span><span>Borja<span>AI</span></span></a>
+      <nav class="side-nav">
+        <button type="button" class="nav-link is-active" data-view="inicio"><span data-icon="home"></span>Inicio</button>
+        <button type="button" class="nav-link" data-view="movimientos"><span data-icon="arrows"></span>Movimientos</button>
+        <button type="button" class="nav-link" data-view="gastos"><span data-icon="receipt"></span>Gastos</button>
+        <button type="button" class="nav-link" data-view="patrimonio"><span data-icon="wallet"></span>Patrimonio</button>
+        <button type="button" class="nav-link" data-view="inversiones"><span data-icon="chart"></span>Inversiones</button>
+        <button type="button" class="nav-link" data-view="mercados"><span data-icon="trend"></span>Mercados</button>
+        <button type="button" class="nav-link" data-view="objetivos"><span data-icon="target"></span>Objetivos</button>
+        <button type="button" class="nav-link" data-view="coach"><span data-icon="sparkles"></span>Coach IA</button>
+      </nav>
+      <div class="sidebar-bottom"><button type="button" class="import-button" data-action="open-import"><span data-icon="upload"></span><span>Anadir informacion</span></button><button type="button" class="import-button" data-action="open-ai-import"><span data-icon="sparkles"></span><span>Importar con IA</span></button><button type="button" class="nav-link settings-link" data-action="open-settings"><span data-icon="settings"></span>Configuracion</button></div>
+    </aside>
+    <div class="app-frame">
+      <header class="topbar"><button type="button" class="icon-button mobile-menu" data-action="toggle-menu" aria-label="Abrir navegacion"><span data-icon="menu"></span></button><div class="page-context"><span class="eyebrow">Resumen personal</span><strong id="topbar-title">Buenos dias, Borja</strong></div><div class="topbar-actions"><button type="button" class="icon-button" data-action="open-import" aria-label="Anadir informacion"><span data-icon="plus"></span></button><button type="button" class="icon-button" data-action="open-ai-import" aria-label="Importar con IA"><span data-icon="sparkles"></span></button><button type="button" class="notification-button" data-action="show-alerts" aria-label="Ver alertas"><span data-icon="bell"></span><b id="alert-count">0</b></button><button type="button" class="profile-button" data-action="open-settings" aria-label="Abrir configuracion">B</button></div></header>
+      <main id="app-view" tabindex="-1"></main>
+      <footer class="app-footer" aria-label="Version de la aplicacion"><span id="app-version"></span></footer>
+    </div>
+  </div>
+  <nav class="mobile-nav" aria-label="Navegacion movil"><button type="button" class="mobile-nav-item is-active" data-view="inicio"><span data-icon="home"></span><span>Inicio</span></button><button type="button" class="mobile-nav-item" data-view="movimientos"><span data-icon="arrows"></span><span>Movimientos</span></button><button type="button" class="mobile-add" data-action="open-import" aria-label="Anadir informacion"><span data-icon="plus"></span></button><button type="button" class="mobile-nav-item" data-view="inversiones"><span data-icon="chart"></span><span>Inversiones</span></button><button type="button" class="mobile-nav-item" data-view="mercados"><span data-icon="trend"></span><span>Mercados</span></button></nav>
+  <div id="modal-root"></div><div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+  <script src="supabase-config.js?v=1.8.3"></script>
+  <script type="module" src="src/auth-gate.js?v=1.8.3"></script>
 </body>
 </html>
