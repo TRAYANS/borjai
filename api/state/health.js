@@ -1,33 +1,45 @@
-import { createConfiguredClient, loadRows, TABLES } from "../_stateCore.js";
-
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   res.setHeader("Cache-Control", "no-store, max-age=0");
-  try {
-    const context = createConfiguredClient(req);
-    const rows = await loadRows(context);
-    const counts = Object.fromEntries(TABLES.map((table) => [table, (rows[table] || []).length]));
-    return res.status(200).json({
-      ok: true,
-      mode: context.mode,
-      supabase: {
-        configured: true,
-        reachable: true,
-        tables: TABLES.length
-      },
-      counts
-    });
-  } catch (error) {
-    const message = error?.message || "Backend no disponible.";
-    const status = /no está configurado|Sesión/.test(message) ? 503 : 500;
-    return res.status(status).json({
+
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
+  if (!url || !key) {
+    return res.status(503).json({
       ok: false,
       mode: "unavailable",
-      supabase: {
-        configured: !/no está configurado/.test(message),
-        reachable: false
-      },
-      error: message
+      supabase: { configured: false, reachable: false },
+      error: "Supabase no está configurado."
+    });
+  }
+
+  try {
+    const root = String(url).replace(/\/$/, "");
+    const response = await fetch(`${root}/rest/v1/`, {
+      headers: { apikey: key, Accept: "application/openapi+json" },
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return res.status(503).json({
+        ok: false,
+        mode: "unavailable",
+        supabase: { configured: true, reachable: false },
+        error: data?.message || `Supabase HTTP ${response.status}`
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      mode: process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.BORJAI_OWNER_ID ? "service_role_owner" : "rls_user",
+      supabase: { configured: true, reachable: true }
+    });
+  } catch (error) {
+    return res.status(503).json({
+      ok: false,
+      mode: "unavailable",
+      supabase: { configured: true, reachable: false },
+      error: error?.message || "No se pudo conectar con Supabase."
     });
   }
 }
