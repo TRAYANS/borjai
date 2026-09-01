@@ -5,9 +5,7 @@ function readSession() {
     const raw = localStorage.getItem(SESSION_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
     return parsed && parsed.access_token ? parsed : null;
-  } catch (_) {
-    return null;
-  }
+  } catch (_) { return null; }
 }
 
 function writeSession(session) {
@@ -138,22 +136,21 @@ export async function createSupabaseClient(config) {
       const refreshed = await refreshSession();
       if (refreshed && await validateSession(refreshed)) return refreshed;
     }
-    const created = await authRequest(baseUrl, anonKey, "/auth/v1/signup", { method: "POST", body: JSON.stringify({}) });
-    const next = sessionFromResponse(created);
-    if (!next) throw new Error("Supabase no ha creado una sesión. Activa Anonymous Sign-Ins mientras se activa la cuenta.");
-    session = next; writeSession(session); return session;
+    return null;
   }
 
   async function getUser() {
     const current = await ensureSession();
+    if (!current) return { data: { user: null }, error: null };
     const response = await fetch(`${baseUrl}/auth/v1/user`, { headers: { apikey: anonKey, Authorization: `Bearer ${current.access_token}` }, cache: "no-store" });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) return { data: { user: null }, error: queryError(data, response.status) };
+    if (!response.ok) { session = null; writeSession(null); return { data: { user: null }, error: queryError(data, response.status) }; }
     session.user = data; writeSession(session); return { data: { user: data }, error: null };
   }
 
   async function updateUser(attributes, options = {}) {
     const current = await ensureSession();
+    if (!current) throw new Error("No hay una sesión activa.");
     const data = await authRequest(baseUrl, anonKey, "/auth/v1/user", { method: "PUT", body: JSON.stringify(attributes) }, current.access_token);
     const next = sessionFromResponse(data);
     if (next) { session = next; writeSession(session); }
@@ -180,18 +177,10 @@ export async function createSupabaseClient(config) {
     session = null; writeSession(null);
   }
 
-  await ensureSession();
-
   return {
     auth: {
       async getSession() { const current = await ensureSession(); return { data: { session: current }, error: null }; },
       async getUser() { return getUser(); },
-      async signInAnonymously() {
-        const created = await authRequest(baseUrl, anonKey, "/auth/v1/signup", { method: "POST", body: JSON.stringify({}) });
-        const next = sessionFromResponse(created);
-        if (!next) throw new Error("Supabase no devolvió una sesión anónima válida.");
-        session = next; writeSession(session); return { data: { user: next.user, session }, error: null };
-      },
       async signInWithPassword(email, password) { return signInWithPassword(email, password); },
       async updateUser(attributes, options) { return updateUser(attributes, options); },
       async resetPasswordForEmail(email, options = {}) { return resetPasswordForEmail(email, options.redirectTo); },
