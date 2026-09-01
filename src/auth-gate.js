@@ -5,6 +5,7 @@ const ACCESS_KEY = "borjai:access";
 const SESSION_KEY = "borjai:supabase:session:v1";
 const PENDING_KEY = "borjai:auth:pending:v1";
 const AUTHENTICATED_KEY = "borjai:auth:permanent:v1";
+const PUBLIC_APP_URL = "https://borjai.vercel.app";
 
 function parseAuthHash() {
   const raw = String(location.hash || "").replace(/^#/, "");
@@ -50,12 +51,12 @@ function screen(mode, message = "") {
     event.preventDefault(); const error = document.getElementById("borjai-auth-error"); error.textContent = "";
     const email = document.getElementById("auth-email")?.value.trim().toLowerCase(); const password = document.getElementById("auth-password")?.value || ""; const confirm = document.getElementById("auth-confirm")?.value || "";
     try {
-      if (forgot) { await client.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}${location.pathname}` }); screen("login", "Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña."); return; }
+      if (forgot) { await client.auth.resetPasswordForEmail(email, { redirectTo: `${PUBLIC_APP_URL}${location.pathname}` }); screen("login", "Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña."); return; }
       if (recover) { if (password !== confirm) throw new Error("Las contraseñas no coinciden."); if (password.length < 10) throw new Error("Usa una contraseña de al menos 10 caracteres."); await client.auth.updateUser({ password }); localStorage.setItem(AUTHENTICATED_KEY, "1"); localStorage.setItem(ACCESS_KEY, "ok"); location.reload(); return; }
       if (activation) {
         if (password !== confirm) throw new Error("Las contraseñas no coinciden."); if (password.length < 10) throw new Error("Usa una contraseña de al menos 10 caracteres.");
         const user = (await client.auth.getUser()).data.user; if (!user?.is_anonymous) throw new Error("Esta sesión ya pertenece a una cuenta permanente. Usa Iniciar sesión.");
-        await client.auth.updateUser({ email }); sessionStorage.setItem(PENDING_KEY, JSON.stringify({ email })); screen("login", "Te hemos enviado un correo de confirmación. Confirma el correo y vuelve a BORJAI para terminar de activar tu cuenta y establecer la contraseña."); return;
+        await client.auth.updateUser({ email }, { emailRedirectTo: `${PUBLIC_APP_URL}${location.pathname}` }); sessionStorage.setItem(PENDING_KEY, JSON.stringify({ email })); screen("login", "Te hemos enviado un correo de confirmación. Confirma el correo y vuelve a BORJAI para terminar de activar tu cuenta y establecer la contraseña."); return;
       }
       await client.auth.signInWithPassword(email, password); localStorage.setItem(AUTHENTICATED_KEY, "1"); localStorage.setItem(ACCESS_KEY, "ok"); location.reload();
     } catch (e) { error.textContent = e?.message || "No se pudo completar la operación."; }
