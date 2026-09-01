@@ -15,17 +15,17 @@ export default async function handler(req, res) {
 
   try {
     const root = String(url).replace(/\/$/, "");
-    const response = await fetch(`${root}/rest/v1/`, {
-      headers: { apikey: key, Accept: "application/openapi+json" },
+    const response = await fetch(`${root}/auth/v1/settings`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
       cache: "no-store"
     });
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
       return res.status(503).json({
         ok: false,
         mode: "unavailable",
         supabase: { configured: true, reachable: false },
-        error: data?.message || `Supabase HTTP ${response.status}`
+        error: data?.message || data?.msg || `Supabase HTTP ${response.status}`
       });
     }
 
