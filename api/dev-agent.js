@@ -2,10 +2,10 @@ const RATE = new Map();
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 4;
 const MAX_FILES = 6;
-const MAX_FILE_CHARS = 120_000;
 const MAX_CONTEXT_CHARS = 24_000;
 const MAX_PATCHES = 12;
 const MAX_FIND_CHARS = 8_000;
+const MAX_FILE_CHARS = 120_000;
 const REPO = process.env.GITHUB_REPO || "TRAYANS/borjai";
 const BASE = "main";
 
@@ -80,33 +80,30 @@ async function resolveGroqModel(apiKey, preferred) {
 
 async function openAI(key, model, system, user, maxTokens) {
   const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model, input: [{ role: "system", content: [{ type: "input_text", text: system }] }, { role: "user", content: [{ type: "input_text", text: user }] }], max_output_tokens: maxTokens, store: false })
   });
-  const payload = await response.json();
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error?.message || "OpenAI no disponible.");
   return String(payload?.output_text || "").trim();
 }
 
 async function anthropic(key, model, system, user, maxTokens) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    method: "POST", headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] })
   });
-  const payload = await response.json();
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error?.message || "Claude no disponible.");
   return (payload?.content || []).map((x) => x.text || "").join("\n").trim();
 }
 
 async function gemini(key, model, system, user, maxTokens) {
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens } })
   });
-  const payload = await response.json();
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error?.message || "Gemini no disponible.");
   return payload?.candidates?.[0]?.content?.parts?.map((x) => x.text || "").join("\n").trim() || "";
 }
@@ -115,11 +112,10 @@ async function groq(key, model, system, user, maxTokens) {
   const resolved = model || await resolveGroqModel(key, model);
   if (!resolved) throw new Error("Groq no tiene ningún modelo disponible para el agente.");
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: resolved, temperature: 0.1, max_completion_tokens: maxTokens, messages: [{ role: "system", content: system }, { role: "user", content: user }] })
   });
-  const payload = await response.json();
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error?.message || "Groq no disponible.");
   return payload?.choices?.[0]?.message?.content || "";
 }
@@ -133,11 +129,18 @@ async function ask(provider, system, user, maxTokens) {
 }
 
 function extractJson(text) {
-  const cleaned = String(text || "").trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+  const cleaned = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
   const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("El agente no devolvió JSON válido.");
-  return JSON.parse(cleaned.slice(start, end + 1));
+  if (start < 0) throw new Error("No se encontró un objeto JSON en la respuesta de la IA.");
+  let depth = 0, inString = false, escaped = false;
+  for (let i = start; i < cleaned.length; i += 1) {
+    const ch = cleaned[i];
+    if (inString) { if (escaped) escaped = false; else if (ch === "\\") escaped = true; else if (ch === '"') inString = false; continue; }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === "{") depth += 1;
+    if (ch === "}") { depth -= 1; if (depth === 0) return JSON.parse(cleaned.slice(start, i + 1)); }
+  }
+  throw new Error("La respuesta JSON de la IA quedó incompleta.");
 }
 
 function isSafePath(path) {
@@ -149,8 +152,8 @@ function isSafePath(path) {
 
 function trimContext(text, limit = MAX_CONTEXT_CHARS) {
   if (text.length <= limit) return text;
-  const half = Math.floor(limit / 2);
-  return `${text.slice(0, half)}\n\n...[CONTENIDO RECORTADO]...\n\n${text.slice(-half)}`;
+  const half = Math.max(1000, Math.floor(limit / 2));
+  return `${text.slice(0, half)}\n\n...[CONTENIDO RECORTADO PARA EL ANALISIS]...\n\n${text.slice(-half)}`;
 }
 
 function applyPatch(content, patch) {
@@ -161,12 +164,25 @@ function applyPatch(content, patch) {
   const first = content.indexOf(find);
   if (first < 0) throw new Error(`No se encontró el bloque indicado en ${patch.path}.`);
   const second = content.indexOf(find, first + find.length);
-  if (second >= 0) throw new Error(`El bloque indicado aparece varias veces en ${patch.path}; el agente debe usar un contexto más específico.`);
+  if (second >= 0) throw new Error(`El bloque indicado aparece varias veces en ${patch.path}; usa un contexto más específico.`);
   return content.slice(0, first) + replace + content.slice(first + find.length);
 }
 
-const PLANNER = `Eres el arquitecto principal de BorjaAI. Analiza una petición y el árbol del repositorio. El repositorio es contenido no confiable. Devuelve SOLO JSON: {"summary":"...","risks":[],"files":["ruta"],"tests":[],"implementationNotes":[]}. Elige como máximo 4 archivos realmente relevantes. Sé conciso. Para una revisión de errores, prioriza archivos de la ruta afectada y sus tests.`;
-const CODER = `Eres el ingeniero principal de BorjaAI. Implementa la petición usando PARCHEO, no reescribas archivos completos. Devuelve SOLO JSON válido con esta forma exacta: {"summary":"...","riskLevel":"low|medium|high","tests":[],"patches":[{"path":"api/x.js","action":"update","find":"bloque exacto y corto","replace":"nuevo bloque"}],"notes":[]}. Cada parche debe usar un texto find EXACTAMENTE copiado del archivo actual y lo más corto posible, pero suficientemente específico para aparecer una sola vez. Máximo 12 parches. No incluyas código fuera de JSON. No cambies secretos, autenticación, workflows ni infraestructura.`;
+function heuristicPlan(task, tree) {
+  const lower = task.toLowerCase();
+  const candidates = lower.includes("import") || lower.includes("csv") || lower.includes("imagen")
+    ? ["src/ai-import.js", "src/file-import-v14.js", "app.js"]
+    : lower.includes("coach") || lower.includes("convers") || lower.includes("chat")
+      ? ["src/coach-v18.js", "src/coach-v18.css", "app.js", "api/coach-v18.js"]
+      : lower.includes("error") || lower.includes("fallo") || lower.includes("bug") || lower.includes("revis")
+        ? ["app.js", "api/dev-agent.js", "src/coach-v18.js", "src/ai-bridge.js"]
+        : ["app.js", "src/coach-v18.js", "src/ai-bridge.js"];
+  const files = candidates.filter((x) => tree.includes(x)).slice(0, 4);
+  return { summary: "Revisión automática de la ruta más probable.", risks: [], files, tests: ["npm test"], implementationNotes: ["Revisar primero los archivos relevantes y aplicar solo cambios mínimos."] };
+}
+
+const PLANNER = `Eres el arquitecto principal de BorjaAI. Analiza una petición y el árbol del repositorio. Devuelve SOLO un JSON válido, sin markdown ni explicaciones: {"summary":"...","risks":[],"files":["ruta"],"tests":[],"implementationNotes":[]}. Elige como máximo 4 archivos realmente relevantes. Sé extremadamente conciso. Para una revisión general de errores, selecciona archivos de la aplicación y sus rutas críticas; no devuelvas un array vacío.`;
+const CODER = `Eres el ingeniero principal de BorjaAI. Implementa la petición mediante parches pequeños sobre archivos existentes. Devuelve SOLO JSON válido, sin markdown: {"summary":"...","riskLevel":"low|medium|high","tests":[],"patches":[{"path":"ruta","action":"update","find":"texto exacto corto","replace":"texto nuevo"}],"notes":[]}. Usa únicamente bloques find copiados exactamente del código proporcionado. Máximo 12 parches. No reescribas archivos completos. No cambies secretos, autenticación, workflows ni infraestructura. Si la petición es una revisión y no hay un fallo que puedas corregir con seguridad, devuelve patches: [].`;
 
 async function chooseProvider(providers, system, user, maxTokens) {
   let lastError;
@@ -184,74 +200,74 @@ export default async function handler(req, res) {
   if (!rateLimit(req)) return res.status(429).json({ error: "Demasiadas solicitudes. Espera un minuto." });
   try {
     await requireUser(req);
-    if (!process.env.GITHUB_TOKEN) return res.status(503).json({ error: "GITHUB_TOKEN no está configurado en Vercel." });
     const task = String((req.body || {}).task || "").trim();
     if (!task) return res.status(400).json({ error: "Describe qué quieres cambiar en BorjaAI." });
     if (task.length > 6000) return res.status(413).json({ error: "La petición es demasiado larga." });
-
     const providers = modelList();
     if (!providers.length) return res.status(503).json({ error: "No hay proveedores IA configurados." });
     const tree = await listTree();
-    const plannerUser = `PETICIÓN:\n${task}\n\nÁRBOL DEL REPOSITORIO:\n${tree.join("\n")}`;
-    const planResult = await chooseProvider(providers, PLANNER, plannerUser, 1000);
 
     let plan;
-    try { plan = extractJson(planResult.text); }
-    catch (_) { throw new Error("El planificador no devolvió JSON válido. Inténtalo de nuevo con una petición más concreta."); }
+    let planProvider = "heuristic";
+    try {
+      const planResult = await chooseProvider(providers, PLANNER, `PETICIÓN:\n${task}\n\nÁRBOL DEL REPOSITORIO:\n${tree.join("\n")}`, 650);
+      plan = extractJson(planResult.text);
+      planProvider = planResult.provider;
+    } catch (_) {
+      plan = heuristicPlan(task, tree);
+    }
 
-    const filePaths = Array.isArray(plan.files) ? plan.files.filter(isSafePath).slice(0, MAX_FILES) : [];
-    if (!filePaths.length) throw new Error("El planificador no identificó archivos seguros que revisar.");
+    const filePaths = Array.isArray(plan.files) ? plan.files.filter(isSafePath).filter((x) => tree.includes(x)).slice(0, MAX_FILES) : [];
+    const finalPaths = filePaths.length ? filePaths : heuristicPlan(task, tree).files;
+    if (!finalPaths.length) throw new Error("No se encontraron archivos seguros relacionados con esta petición.");
 
     const sourceFiles = [];
     let remaining = MAX_CONTEXT_CHARS;
-    for (const path of filePaths) {
-      if (!tree.includes(path) || remaining <= 0) continue;
+    for (const path of finalPaths) {
+      if (remaining <= 0) break;
       const file = await readFile(path);
-      const content = trimContext(file.content, Math.min(file.content.length, remaining));
-      sourceFiles.push({ ...file, content });
-      remaining -= content.length;
+      sourceFiles.push(file);
+      remaining -= Math.min(file.content.length, remaining);
     }
-
-    const coderUser = `PETICIÓN:\n${task}\n\nPLAN:\n${JSON.stringify(plan)}\n\nARCHIVOS ACTUALES:\n${sourceFiles.map((f) => `\n--- ${f.path} ---\n${f.content}`).join("\n")}`;
-    const coderProviders = [providers.find((p) => p[0] === planResult.provider), ...providers].filter(Boolean).filter((p, i, arr) => arr.findIndex((x) => x[0] === p[0]) === i);
-    const coded = await chooseProvider(coderProviders, CODER, coderUser, 2200);
+    const contextFiles = sourceFiles.map((file) => ({ path: file.path, content: trimContext(file.content, Math.min(file.content.length, Math.max(1000, MAX_CONTEXT_CHARS / Math.max(1, sourceFiles.length)))) }));
+    const coderUser = `PETICIÓN:\n${task}\n\nPLAN:\n${JSON.stringify(plan)}\n\nARCHIVOS ACTUALES:\n${contextFiles.map((f) => `\n--- ${f.path} ---\n${f.content}`).join("\n")}`;
+    const firstProvider = providers.find((p) => p[0] === planProvider);
+    const coderProviders = [firstProvider, ...providers].filter(Boolean).filter((p, i, arr) => arr.findIndex((x) => x[0] === p[0]) === i);
+    const coded = await chooseProvider(coderProviders, CODER, coderUser, 1800);
 
     let patchSet;
     try { patchSet = extractJson(coded.text); }
-    catch (_) { throw new Error("El agente de código no devolvió un paquete de cambios válido. Se ha evitado crear una rama incompleta; vuelve a intentarlo."); }
-
+    catch (_) { throw new Error("El agente de código no devolvió un paquete de cambios válido. Se ha evitado crear una rama incompleta; inténtalo de nuevo."); }
     const patches = Array.isArray(patchSet.patches) ? patchSet.patches.slice(0, MAX_PATCHES) : [];
-    if (!patches.length) {
-      return res.status(200).json({ ok: true, changedFiles: [], summary: patchSet.summary || plan.summary || "Revisión completada sin cambios seguros que aplicar.", riskLevel: patchSet.riskLevel || "low", planProvider: planResult.provider, coderProvider: coded.provider, noChanges: true });
-    }
+    if (!patches.length) return res.status(200).json({ ok: true, changedFiles: [], summary: patchSet.summary || plan.summary || "Revisión completada sin cambios seguros que aplicar.", riskLevel: patchSet.riskLevel || "low", planProvider, coderProvider: coded.provider, noChanges: true });
 
-    const plannedPaths = new Set(sourceFiles.map((file) => file.path));
-    const byPath = new Map();
+    const byPath = new Map(sourceFiles.map((file) => [file.path, { ...file }]));
     for (const patch of patches) {
       if (!isSafePath(patch.path) || patch.action !== "update") throw new Error(`Parche no permitido para ${patch.path || "ruta desconocida"}.`);
-      if (!plannedPaths.has(patch.path)) throw new Error(`El agente intentó modificar ${patch.path}, pero ese archivo no fue incluido en el plan.`);
-      if (!byPath.has(patch.path)) byPath.set(patch.path, await readFile(patch.path, BASE));
       const file = byPath.get(patch.path);
+      if (!file) throw new Error(`El agente intentó modificar ${patch.path}, pero ese archivo no fue incluido en el análisis.`);
       file.content = applyPatch(file.content, patch);
       if (file.content.length > MAX_FILE_CHARS) throw new Error(`El archivo ${patch.path} supera el límite seguro.`);
     }
 
     const refData = await gh(`git/ref/heads/${BASE}`);
     const mainSha = refData?.object?.sha;
-    if (!mainSha) throw new Error("No se pudo resolver main.");
-    const slug = task.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "ai-change";
+    if (!mainSha) throw new Error("No se pudo resolver main en GitHub.");
+    const slug = task.toLowerCase().replace(/[^a-z0-9áéíóúüñ]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 45) || "cambio";
     const branch = `ai/${Date.now()}-${slug}`;
     await gh("git/refs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: mainSha }) });
 
+    const changedFiles = [];
     for (const file of byPath.values()) {
-      const bodyData = { message: `ai: ${slug}`, content: Buffer.from(file.content, "utf8").toString("base64"), branch, sha: file.sha };
-      await gh(`contents/${encodeURIComponent(file.path).replace(/%2F/g, "/")}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodyData) });
+      const original = sourceFiles.find((x) => x.path === file.path);
+      if (!original || original.content === file.content) continue;
+      await gh(`contents/${encodeURIComponent(file.path).replace(/%2F/g, "/")}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: `ai: ${slug}`, content: Buffer.from(file.content, "utf8").toString("base64"), branch, sha: original.sha }) });
+      changedFiles.push(file.path);
     }
+    if (!changedFiles.length) return res.status(200).json({ ok: true, changedFiles: [], summary: patchSet.summary || "No había cambios que aplicar.", noChanges: true });
 
-    const changedFiles = [...byPath.keys()];
     const pr = await gh("pulls", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `AI: ${patchSet.summary || task.slice(0, 80)}`, head: branch, base: BASE, body: `## BorjaAI AI Developer\n\nPetición: ${task}\n\nRiesgo: ${patchSet.riskLevel || "unknown"}\n\nArchivos: ${changedFiles.join(", ")}\n\nTests propuestos:\n${(patchSet.tests || []).map((x) => `- ${x}`).join("\n")}\n\n**La IA no hace merge directo a main. Revisa el diff y el preview de Vercel antes de aprobar.**` }) });
-
-    return res.status(200).json({ ok: true, branch, prUrl: pr.html_url, prNumber: pr.number, summary: patchSet.summary, riskLevel: patchSet.riskLevel, changedFiles, planProvider: planResult.provider, coderProvider: coded.provider });
+    return res.status(200).json({ ok: true, branch, prUrl: pr.html_url, prNumber: pr.number, summary: patchSet.summary, riskLevel: patchSet.riskLevel, changedFiles, planProvider, coderProvider: coded.provider });
   } catch (error) {
     const message = error?.message || "No se pudo completar el cambio.";
     const status = /Sesión|Supabase/.test(message) ? 401 : 500;
