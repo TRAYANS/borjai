@@ -225,11 +225,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, changedFiles: [], summary: patchSet.summary || plan.summary || "Revisión completada sin cambios seguros que aplicar.", riskLevel: patchSet.riskLevel || "low", planProvider: planResult.provider, coderProvider: coded.provider, noChanges: true });
     }
 
-    const byPath = new Map(sourceFiles.map((file) => [file.path, { ...file }]));
+    const plannedPaths = new Set(sourceFiles.map((file) => file.path));
+    const byPath = new Map();
     for (const patch of patches) {
       if (!isSafePath(patch.path) || patch.action !== "update") throw new Error(`Parche no permitido para ${patch.path || "ruta desconocida"}.`);
+      if (!plannedPaths.has(patch.path)) throw new Error(`El agente intentó modificar ${patch.path}, pero ese archivo no fue incluido en el plan.`);
+      if (!byPath.has(patch.path)) byPath.set(patch.path, await readFile(patch.path, BASE));
       const file = byPath.get(patch.path);
-      if (!file) throw new Error(`El agente intentó modificar ${patch.path}, pero ese archivo no fue incluido en el plan.`);
       file.content = applyPatch(file.content, patch);
       if (file.content.length > MAX_FILE_CHARS) throw new Error(`El archivo ${patch.path} supera el límite seguro.`);
     }
@@ -242,15 +244,11 @@ export default async function handler(req, res) {
     await gh("git/refs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: mainSha }) });
 
     for (const file of byPath.values()) {
-      const original = sourceFiles.find((x) => x.path === file.path);
-      if (!original || original.content === file.content) continue;
-      const bodyData = { message: `ai: ${slug}`, content: Buffer.from(file.content, "utf8").toString("base64"), branch, sha: original.sha };
+      const bodyData = { message: `ai: ${slug}`, content: Buffer.from(file.content, "utf8").toString("base64"), branch, sha: file.sha };
       await gh(`contents/${encodeURIComponent(file.path).replace(/%2F/g, "/")}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodyData) });
     }
 
-    const changedFiles = [...byPath.values()].filter((file) => sourceFiles.find((x) => x.path === file.path)?.content !== file.content).map((file) => file.path);
-    if (!changedFiles.length) return res.status(200).json({ ok: true, changedFiles: [], summary: patchSet.summary || "No había cambios que aplicar.", noChanges: true });
-
+    const changedFiles = [...byPath.keys()];
     const pr = await gh("pulls", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `AI: ${patchSet.summary || task.slice(0, 80)}`, head: branch, base: BASE, body: `## BorjaAI AI Developer\n\nPetición: ${task}\n\nRiesgo: ${patchSet.riskLevel || "unknown"}\n\nArchivos: ${changedFiles.join(", ")}\n\nTests propuestos:\n${(patchSet.tests || []).map((x) => `- ${x}`).join("\n")}\n\n**La IA no hace merge directo a main. Revisa el diff y el preview de Vercel antes de aprobar.**` }) });
 
     return res.status(200).json({ ok: true, branch, prUrl: pr.html_url, prNumber: pr.number, summary: patchSet.summary, riskLevel: patchSet.riskLevel, changedFiles, planProvider: planResult.provider, coderProvider: coded.provider });
