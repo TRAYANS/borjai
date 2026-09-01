@@ -96,12 +96,7 @@ export function toDatabaseRows(state, userId) {
       };
     }),
     categories: Array.from(categories.values()).map(function(c) {
-      return {
-        user_id: userId,
-        name: c.name,
-        type: c.type,
-        is_system: false
-      };
+      return { user_id: userId, name: c.name, type: c.type, is_system: false };
     }),
     transactions: dedupeTransactions(state.transactions).map(function(t) {
       return {
@@ -135,47 +130,13 @@ export function toDatabaseRows(state, userId) {
       };
     }),
     liabilities: (state.debts || []).map(function(d) {
-      return {
-        user_id: userId,
-        legacy_id: legacyId("liability", d.id),
-        type: d.type || "other",
-        name: d.name || "Deuda",
-        outstanding_balance: asNumber(d.balance || d.outstandingBalance),
-        interest_rate: d.interestRate || null,
-        monthly_payment: d.monthlyPayment || null,
-        currency: d.currency || "EUR",
-        metadata: d.metadata || {}
-      };
+      return { user_id: userId, legacy_id: legacyId("liability", d.id), type: d.type || "other", name: d.name || "Deuda", outstanding_balance: asNumber(d.balance || d.outstandingBalance), interest_rate: d.interestRate || null, monthly_payment: d.monthlyPayment || null, currency: d.currency || "EUR", metadata: d.metadata || {} };
     }),
-    investments: (state.assets || []).filter(function(a) {
-      return ["Inversiones", "Criptomonedas", "Oro y Metales"].includes(a.group);
-    }).map(function(a) {
-      return {
-        user_id: userId,
-        legacy_id: "investment-" + legacyId("asset", a.id),
-        ticker: a.ticker || null,
-        name: a.name || "Inversion",
-        type: a.type || "other",
-        quantity: a.quantity || null,
-        buy_price: a.buyPrice || null,
-        current_price: a.currentPrice || null,
-        current_value: asNumber(a.value),
-        cost_basis: asNumber(a.cost),
-        currency: a.currency || "EUR",
-        metadata: { assetLegacyId: a.id || null, group: a.group || null }
-      };
+    investments: (state.assets || []).filter(function(a) { return ["Inversiones", "Criptomonedas", "Oro y Metales"].includes(a.group); }).map(function(a) {
+      return { user_id: userId, legacy_id: "investment-" + legacyId("asset", a.id), ticker: a.ticker || null, name: a.name || "Inversion", type: a.type || "other", quantity: a.quantity || null, buy_price: a.buyPrice || null, current_price: a.currentPrice || null, current_value: asNumber(a.value), cost_basis: asNumber(a.cost), currency: a.currency || "EUR", metadata: { assetLegacyId: a.id || null, group: a.group || null } };
     }),
     goals: (state.goals || []).map(function(g) {
-      return {
-        user_id: userId,
-        legacy_id: legacyId("goal", g.id),
-        name: g.name || "Objetivo",
-        target_amount: asNumber(g.target),
-        current_amount: asNumber(g.current),
-        target_date: g.date || null,
-        priority: g.priority || "Media",
-        status: g.status || "active"
-      };
+      return { user_id: userId, legacy_id: legacyId("goal", g.id), name: g.name || "Objetivo", target_amount: asNumber(g.target), current_amount: asNumber(g.current), target_date: g.date || null, priority: g.priority || "Media", status: g.status || "active" };
     }),
     imports: (state.imports || []).map(function(i) {
       return {
@@ -184,22 +145,13 @@ export function toDatabaseRows(state, userId) {
         source_type: i.sourceType || "csv",
         file_name: i.fileName || "importacion",
         status: i.status || "confirmed",
-        raw_metadata: { count: i.count || 0, ids: i.ids || [] },
+        raw_metadata: { count: i.count || 0, ids: i.ids || [], generalNotes: i.generalNotes || "" },
         created_at: i.createdAt ? i.createdAt + "T00:00:00Z" : new Date().toISOString()
       };
     }),
     wealth_snapshots: (state.snapshots || []).map(function(s) {
       const date = snapshotDate(s);
-      return {
-        user_id: userId,
-        legacy_id: legacyId("snapshot", date),
-        snapshot_date: date || new Date().toISOString().slice(0, 10),
-        assets_total: asNumber(s.value),
-        liabilities_total: 0,
-        net_worth: asNumber(s.value),
-        liquid_total: null,
-        metadata: { month: (s.month || date.slice(0, 7) || null), source: s.source || "app" }
-      };
+      return { user_id: userId, legacy_id: legacyId("snapshot", date), snapshot_date: date || new Date().toISOString().slice(0, 10), assets_total: asNumber(s.value), liabilities_total: 0, net_worth: asNumber(s.value), liquid_total: null, metadata: { month: (s.month || date.slice(0, 7) || null), source: s.source || "app" } };
     })
   };
 }
@@ -209,29 +161,12 @@ export function fromDatabaseRows(rows, fallbackFactory) {
   return {
     version: 1,
     profile: fallback.profile || {},
-    accounts: (rows.accounts || []).map(function(a) {
-      return { id: a.legacy_id || a.id, name: a.name, kind: a.type === "cash" ? "cash" : a.type === "broker" ? "broker" : "bank", balance: asNumber(a.current_balance) };
-    }),
-    assets: (rows.assets || []).map(function(a) {
-      const metadata = a.metadata || {};
-      return { id: a.legacy_id || a.id, name: a.name, ticker: a.ticker || "", group: metadata.group || "Otros Activos", type: metadata.legacyType || a.type, value: asNumber(a.current_value), cost: asNumber(a.cost_basis) };
-    }),
-    debts: (rows.liabilities || []).map(function(d) {
-      return { id: d.legacy_id || d.id, name: d.name, type: d.type, balance: asNumber(d.outstanding_balance), currency: d.currency || "EUR" };
-    }),
-    transactions: dedupeTransactions((rows.transactions || []).map(function(t) {
-      return { id: t.legacy_id || t.id, date: t.date, merchant: t.merchant || t.description, description: t.description, amount: asNumber(t.amount), type: t.type, category: t.category_name || "Otros", subcategory: t.subcategory || "", accountId: t.account_legacy_id, destinationAccountId: t.destination_account_legacy_id || "", source: t.source || "manual", notes: t.notes || "", importId: t.legacy_import_id || "" };
-    })),
-    goals: (rows.goals || []).map(function(g) {
-      return { id: g.legacy_id || g.id, name: g.name, target: asNumber(g.target_amount), current: asNumber(g.current_amount), date: g.target_date, priority: g.priority || "Media", status: g.status || "active" };
-    }),
-    imports: (rows.imports || []).map(function(i) {
-      const meta = i.raw_metadata || {};
-      return { id: i.legacy_id || i.id, fileName: i.file_name, createdAt: String(i.created_at || "").slice(0, 10), count: meta.count || 0, ids: meta.ids || [], status: i.status };
-    }),
-    snapshots: (rows.wealth_snapshots || []).map(function(s) {
-      const date = String(s.snapshot_date || "").slice(0, 10);
-      return { date: date, month: (s.metadata && s.metadata.month) ? s.metadata.month : date.slice(0, 7), value: asNumber(s.net_worth) };
-    }).filter(function(s){ return s.date; })
+    accounts: (rows.accounts || []).map(function(a) { return { id: a.legacy_id || a.id, name: a.name, kind: a.type === "cash" ? "cash" : a.type === "broker" ? "broker" : "bank", balance: asNumber(a.current_balance) }; }),
+    assets: (rows.assets || []).map(function(a) { const metadata = a.metadata || {}; return { id: a.legacy_id || a.id, name: a.name, ticker: a.ticker || "", group: metadata.group || "Otros Activos", type: metadata.legacyType || a.type, value: asNumber(a.current_value), cost: asNumber(a.cost_basis) }; }),
+    debts: (rows.liabilities || []).map(function(d) { return { id: d.legacy_id || d.id, name: d.name, type: d.type, balance: asNumber(d.outstanding_balance), currency: d.currency || "EUR" }; }),
+    transactions: dedupeTransactions((rows.transactions || []).map(function(t) { return { id: t.legacy_id || t.id, date: t.date, merchant: t.merchant || t.description, description: t.description, amount: asNumber(t.amount), type: t.type, category: t.category_name || "Otros", subcategory: t.subcategory || "", accountId: t.account_legacy_id, destinationAccountId: t.destination_account_legacy_id || "", source: t.source || "manual", notes: t.notes || "", importId: t.legacy_import_id || "" }; })),
+    goals: (rows.goals || []).map(function(g) { return { id: g.legacy_id || g.id, name: g.name, target: asNumber(g.target_amount), current: asNumber(g.current_amount), date: g.target_date, priority: g.priority || "Media", status: g.status || "active" }; }),
+    imports: (rows.imports || []).map(function(i) { const meta = i.raw_metadata || {}; return { id: i.legacy_id || i.id, fileName: i.file_name, createdAt: String(i.created_at || "").slice(0, 10), count: meta.count || 0, ids: meta.ids || [], status: i.status, generalNotes: meta.generalNotes || "" }; }),
+    snapshots: (rows.wealth_snapshots || []).map(function(s) { const date = String(s.snapshot_date || "").slice(0, 10); return { date: date, month: (s.metadata && s.metadata.month) ? s.metadata.month : date.slice(0, 7), value: asNumber(s.net_worth) }; }).filter(function(s){ return s.date; })
   };
 }
