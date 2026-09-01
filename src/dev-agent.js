@@ -1,6 +1,11 @@
 const STORAGE_KEY = "borjai:mvp:v1";
 
 function readAccessToken() {
+  try {
+    const direct = JSON.parse(localStorage.getItem("borjai:supabase:session:v1") || "null");
+    if (direct?.access_token) return direct.access_token;
+  } catch (_) {}
+  if (window.BORJAI_SESSION_TOKEN) return window.BORJAI_SESSION_TOKEN;
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i) || "";
     if (!key.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
@@ -30,7 +35,7 @@ function addAgentUI() {
     const status = card.querySelector("#dev-agent-status");
     if (!task) return;
     const token = readAccessToken();
-    if (!token) { status.textContent = "No encuentro tu sesión de Supabase."; return; }
+    if (!token) { status.textContent = "No encuentro tu sesión de Supabase. Recarga la aplicación e inténtalo de nuevo."; return; }
     const button = form.querySelector("button");
     button.disabled = true;
     status.textContent = "Analizando el repositorio y preparando el cambio…";
@@ -42,7 +47,9 @@ function addAgentUI() {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || "No se pudo programar el cambio.");
-      status.innerHTML = `<strong style="color:#fff">Cambio preparado.</strong> ${payload.summary || ""}<br><span>Archivos: ${(payload.changedFiles || []).join(", ")}</span><br><a href="${payload.prUrl}" target="_blank" rel="noreferrer" style="color:#ff7a82">Revisar Pull Request y preview de Vercel →</a>`;
+      const files = Array.isArray(payload.changedFiles) ? payload.changedFiles.join(", ") : "";
+      const pr = payload.prUrl ? `<a href="${payload.prUrl}" target="_blank" rel="noreferrer" style="color:#ff7a82">Revisar Pull Request y preview de Vercel →</a>` : "";
+      status.innerHTML = `<strong style="color:#fff">Cambio preparado.</strong> ${payload.summary || ""}${files ? `<br><span>Archivos: ${files}</span>` : ""}${pr ? `<br>${pr}` : ""}`;
       form.reset();
     } catch (error) {
       status.textContent = `No se pudo completar: ${error.message}`;
