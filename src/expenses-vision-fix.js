@@ -1,4 +1,4 @@
-/* BorjaAI · Gastos · repair malformed visual-layer nesting from v1.8.5 */
+/* BorjaAI · Gastos · repair malformed visual-layer nesting from v1.8.6 */
 (function () {
   const STYLE_ID = "borjai-expenses-vision-fix-css";
 
@@ -83,13 +83,17 @@
   function repair(root) {
     if (!root || !root.matches(".expenses-redesign")) return;
     const content = root.querySelector(".expense-chart-content");
+    const donutWrap = root.querySelector(".expense-donut-wrap");
     const donut = root.querySelector(".expense-donut");
     const list = root.querySelector(".expense-category-list");
-    if (!content || !donut || !list) return;
+    if (!content || !donutWrap || !donut || !list) return;
 
-    // v1.8.5 accidentally nested the category list inside the donut.
-    // Move it back to the chart grid so the donut and list become siblings.
-    if (list.parentElement === donut) content.appendChild(list);
+    // The visual renderer historically omitted the closing tag for
+    // .expense-donut-wrap, so the category list became its child.
+    // Force the intended structure: donut-wrap and category-list are
+    // siblings inside the chart grid.
+    if (list.parentElement !== content) content.appendChild(list);
+    if (donut.parentElement !== donutWrap) donutWrap.appendChild(donut);
   }
 
   function repairAll() {
