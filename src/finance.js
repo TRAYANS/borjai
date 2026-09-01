@@ -44,34 +44,112 @@ export function allocations(state) {
   ].filter(function(a) { return a.value > 0; });
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function linearScore(value, bad, good) {
+  if (value <= bad) return 0;
+  if (value >= good) return 100;
+  return (value - bad) / (good - bad) * 100;
+}
+
+function inverseScore(value, good, bad) {
+  if (value <= good) return 100;
+  if (value >= bad) return 0;
+  return (bad - value) / (bad - good) * 100;
+}
+
 export function health(state, key, formatters) {
   const money = formatters.money;
   const percent = formatters.percent;
   const m = metrics(state, key);
   const w = wealth(state);
   const l = liquid(state);
+  const d = debt(state);
   const profile = state.profile || {};
-  const target = Math.max(m.expense * Number(profile.emergency || 0), Math.max(w, 0) * 0.1);
+  const emergencyMonths = Math.max(1, Number(profile.emergency || 3));
   const allocation = allocations(state);
-  const divisor = w || 1;
-  const max = allocation.reduce(function(n, a) { return Math.max(n, a.value / divisor); }, 0);
+
+  // The score is calculated only from the financial data stored in the app.
+  // No fixed health score or artificial positive baseline is used.
+  const expenseBase = m.expense;
+  const reserveTarget = expenseBase > 0 ? expenseBase * emergencyMonths : 0;
+  const liquidityMonths = expenseBase > 0 ? l / expenseBase : 0;
+  const debtRatio = w > 0 ? d / w : (d > 0 ? 1 : 0);
+  const spendingRatio = m.income > 0 ? m.expense / m.income : (m.expense > 0 ? 1 : 0);
   const invested = group(state, "Inversiones") + group(state, "Criptomonedas") + group(state, "Oro y Metales");
+  const investedRatio = w > 0 ? invested / w : 0;
+  const maxAllocation = w > 0 ? allocation.reduce(function(n, a) { return Math.max(n, Math.max(0, a.value) / w); }, 0) : 0;
+  const cryptoRatio = w > 0 ? group(state, "Criptomonedas") / w : 0;
   const goals = state.goals || [];
-  const progress = goals.length ? goals.reduce(function(s, g) {
-    const targetAmount = Number(g.target || 0);
-    if (targetAmount <= 0) return s;
-    return s + Math.min(Number(g.current || 0) / targetAmount, 1);
-  }, 0) / goals.length : 0;
+  const validGoals = goals.filter(function(g) { return Number(g.target || 0) > 0; });
+  const progress = validGoals.length ? validGoals.reduce(function(s, g) {
+    return s + clamp(Number(g.current || 0) / Number(g.target || 1), 0, 1);
+  }, 0) / validGoals.length : 0;
+
   const parts = [
-    { label: "Ahorro", score: Math.max(0, Math.min(100, m.rate / 0.2 * 100)), note: m.rate >= 0.15 ? "Ritmo saludable" : "Conviene elevar la tasa" },
-    { label: "Liquidez", score: Math.max(0, Math.min(100, l / (target || 1) * 100)), note: money(l) + " frente a " + money(target) + " de reserva" },
-    { label: "Inversion", score: Math.min(100, invested / divisor / 0.65 * 100), note: percent(w ? invested / divisor : 0) + " del patrimonio invertido" },
-    { label: "Diversificacion", score: Math.max(25, Math.min(100, 120 - max * 100)), note: max > 0.45 ? "Hay concentracion relevante" : "Reparto razonable entre grupos" },
-    { label: "Gastos", score: m.savings > 0 ? Math.min(100, 75 + m.rate * 70) : 25, note: m.savings > 0 ? "El mes cierra con ahorro" : "El gasto supera a los ingresos" },
-    { label: "Deuda", score: debt(state) ? Math.max(15, 100 - debt(state) / divisor * 150) : 100, note: debt(state) ? "Hay deuda registrada" : "No hay deudas registradas" },
-    { label: "Objetivos", score: progress * 100, note: Math.round(progress * 100) + "% de avance medio" }
+    {
+      label: "Ahorro",
+      score: m.income > 0 ? linearScore(m.rate, 0, 0.20) : 0,
+      note: m.income > 0 ? percent(m.rate) + " de tasa de ahorro" : "Faltan ingresos del mes"
+    },
+    {
+      label: "Liquidez",
+      score: expenseBase > 0 ? linearScore(liquidityMonths, 0, emergencyMonths) : 0,
+      note: expenseBase > 0 ? money(l) + " frente a " + money(reserveTarget) + " de reserva" : "Faltan gastos del mes"
+    },
+    {
+      label: "Inversion",
+      score: w > 0 ? linearScore(investedRatio, 0.05, 0.50) : 0,
+      note: w > 0 ? percent(investedRatio) + " del patrimonio en activos de inversión" : "Sin patrimonio registrado"
+    },
+    {
+      label: "Diversificacion",
+      score: w > 0 ? inverseScore(maxAllocation, 0.30, 0.70) : 0,
+      note: w > 0 ? (maxAllocation > 0 ? percent(maxAllocation) + " en la mayor posición" : "Sin posiciones") : "Sin patrimonio registrado"
+    },
+    {
+      label: "Gastos",
+      score: m.income > 0 ? inverseScore(spendingRatio, 0.70, 1) : 0,
+      note: m.income > 0 ? percent(spendingRatio) + " de los ingresos destinados a gasto" : "Faltan ingresos del mes"
+    },
+    {
+      label: "Deuda",
+      score: d <= 0 ? 100 : (w > 0 ? inverseScore(debtRatio, 0.10, 0.50) : 0),
+      note: d > 0 ? money(d) + " de deuda registrada" : "No hay deudas registradas"
+    },
+    {
+      label: "Objetivos",
+      score: validGoals.length ? progress * 100 : 0,
+      note: validGoals.length ? Math.round(progress * 100) + "% de avance medio" : "No hay objetivos con importe"
+    }
   ];
-  return { score: Math.round(parts.reduce(function(s, p) { return s + p.score; }, 0) / parts.length), parts: parts, liquid: l, target: target, metrics: m };
+
+  // Penalise excessive concentration in crypto without treating it as an
+  // all-or-nothing rule; this keeps the score responsive to the actual mix.
+  if (cryptoRatio > 0.15) {
+    const cryptoPenalty = clamp((cryptoRatio - 0.15) / 0.35 * 25, 0, 25);
+    parts[3].score = clamp(parts[3].score - cryptoPenalty, 0, 100);
+    parts[3].note += "; cripto " + percent(cryptoRatio);
+  }
+
+  const score = Math.round(parts.reduce(function(s, p) { return s + p.score; }, 0) / parts.length);
+  const populated = [m.income > 0, m.expense > 0, w !== 0, d > 0, validGoals.length > 0].filter(Boolean).length;
+  const confidence = populated >= 4 ? "alta" : populated >= 2 ? "media" : "baja";
+
+  return {
+    score: score,
+    parts: parts,
+    liquid: l,
+    target: reserveTarget,
+    liquidityMonths: liquidityMonths,
+    debtRatio: debtRatio,
+    spendingRatio: spendingRatio,
+    investedRatio: investedRatio,
+    confidence: confidence,
+    metrics: m
+  };
 }
 
 export function recommendation(state, key, formatters) {
