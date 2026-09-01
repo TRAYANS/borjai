@@ -68,13 +68,27 @@ function screen(mode, message = "") {
 }
 
 let client;
+
+async function loadApplication() {
+  // app.js expects the full application shell to exist before its first render.
+  await import("../app.js?v=1.8.3");
+  await import("./ai-import.js?v=1.8.3");
+  await import("./ai-bridge.js?v=1.8.3");
+  await import("./file-import-v14.js?v=1.8.3");
+  await import("./wealth-dashboard.js?v=1.8.3");
+  await import("./v14-stability.js?v=1.8.3");
+  await import("./markets-v14.js?v=1.8.3");
+  await import("./ai-council.js?v=1.8.3");
+  await import("./coach-v18.js?v=1.8.3");
+}
+
 async function start() {
   parseAuthHash(); const config = await loadRuntimeConfig();
   if (!hasSupabaseConfig(config)) { screen("login", "La autenticación de Supabase no está configurada todavía."); return; }
   client = await createSupabaseClient(config); const user = (await client.auth.getUser()).data.user;
   const authType = (() => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null")?.auth_type || ""; } catch (_) { return ""; } })();
   if (user && !isAllowedEmail(user.email) && !user.is_anonymous) { await client.auth.signOut(); screen("login", "Esta cuenta no está autorizada para BORJAI."); return; }
-  if (user && !user.is_anonymous && user.email_confirmed_at) { if (authType === "recovery") { screen("recover", "Has verificado tu identidad. Elige una nueva contraseña."); return; } localStorage.setItem(AUTHENTICATED_KEY, "1"); localStorage.setItem(ACCESS_KEY, "ok"); await import("../app.js"); return; }
+  if (user && !user.is_anonymous && user.email_confirmed_at) { if (authType === "recovery") { screen("recover", "Has verificado tu identidad. Elige una nueva contraseña."); return; } localStorage.setItem(AUTHENTICATED_KEY, "1"); localStorage.setItem(ACCESS_KEY, "ok"); await loadApplication(); return; }
   screen("activate");
 }
 start().catch((error) => screen("login", error?.message || "No se pudo iniciar la autenticación."));
