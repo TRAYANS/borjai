@@ -102,12 +102,28 @@ export function createConfiguredClient(req) {
       client: createRestClient(url, serviceKey, serviceKey),
       userId: ownerId || null,
       token: token || null,
+      tokenUserId: null,
       serviceRole: true,
       mode: ownerId ? "service_role_owner" : token ? "service_role_authenticated_user" : "service_role_discovered_owner"
     };
   }
   if (!token) throw new Error("Sesión de BorjaAI no disponible.");
   return { client: createRestClient(url, anonKey, token), token, serviceRole: false, mode: "rls_user" };
+}
+
+async function discoverAuthUserId(context) {
+  const root = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!root || !serviceKey) return null;
+  const response = await fetch(`${root}/auth/v1/admin/users?per_page=1000&page=1`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Accept: "application/json" },
+    cache: "no-store"
+  });
+  if (!response.ok) return null;
+  const payload = await response.json().catch(() => ({}));
+  const users = Array.isArray(payload) ? payload : (payload.users || []);
+  const allowed = users.find((user) => user?.email && user.email.toLowerCase() === "borjabuzquin@gmail.com") || users.find((user) => user?.id);
+  return allowed?.id || null;
 }
 
 export async function resolveUser(context) {
@@ -120,13 +136,18 @@ export async function resolveUser(context) {
         return context.userId;
       }
     }
+    const authUserId = await discoverAuthUserId(context);
+    if (authUserId) {
+      context.userId = authUserId;
+      return context.userId;
+    }
     for (const table of TABLES) {
       const result = await context.client.from(table).select("user_id").order("created_at", { ascending: true });
       if (result.error) continue;
       const candidate = (result.data || []).find((row) => row.user_id);
       if (candidate?.user_id) { context.userId = candidate.user_id; return context.userId; }
     }
-    throw new Error("No se encontró un usuario propietario con datos financieros.");
+    throw new Error("No se pudo identificar la cuenta de BorjaAI.");
   }
   const result = await context.client.auth.getUser(context.token);
   if (result.error || !result.data?.user?.id) throw new Error("Sesión de BorjaAI no válida.");
