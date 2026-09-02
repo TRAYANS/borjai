@@ -1,49 +1,57 @@
-/* BorjaAI · visual refinement from the user's three reference screenshots */
+/* BorjaAI · visual reference pass */
 
-/* Inicio: compact hierarchy and keep the complete robot visible. */
-.view-inicio .dashboard-grid { gap: 14px; }
-.view-inicio .hero-metrics { gap: 14px; }
-.view-inicio .wealth-panel, .view-inicio .health-panel { min-height: 220px; }
-.view-inicio .chart-panel, .view-inicio .recommendation-panel, .view-inicio .distribution-panel { padding: 20px; }
-.view-inicio .coach-strip { min-height: 220px; display: grid; grid-template-columns: minmax(0,1fr) minmax(350px,38%); overflow: hidden; }
-.view-inicio .coach-strip-copy { min-width: 0; padding: 22px; }
-.view-inicio .coach-strip .coach-art { min-width: 0; width: 100%; min-height: 220px; height: 100%; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; }
-.view-inicio .coach-strip .borjai-robot { width: min(100%, 370px); height: 100%; min-height: 220px; max-height: 300px; object-fit: contain; }
-.view-inicio .metric-grid { gap: 12px; }
-.view-inicio .metric-panel { min-height: 108px; padding: 15px; }
-.view-inicio .metric-panel-value { font-size: 23px; line-height: 1.05; }
-.view-inicio .metric-panel-note { font-size: 11px; margin-top: 7px; }
-.view-inicio .content-grid, .view-inicio .side-stack { gap: 14px; }
+/* INICIO: compactar la composición y mostrar el asistente completo. */
+.view-inicio .dashboard-grid,.view-inicio .hero-metrics,.view-inicio .metric-grid,.view-inicio .content-grid,.view-inicio .side-stack{gap:12px}
+.view-inicio .metric-panel{min-height:104px;padding:14px}
+.view-inicio .metric-panel-value{font-size:22px;line-height:1.05}
+.view-inicio .metric-panel-note{font-size:11px;margin-top:6px}
+.view-inicio .chart-panel,.view-inicio .recommendation-panel,.view-inicio .distribution-panel{padding:18px}
+.view-inicio .coach-strip{min-height:205px;height:205px;display:grid;grid-template-columns:minmax(0,1fr) 285px;overflow:hidden}
+.view-inicio .coach-strip-copy{min-width:0;padding:18px}
+.view-inicio .coach-strip .coach-art{width:285px;min-width:285px;height:205px;min-height:205px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.view-inicio .coach-strip .coach-art::before{width:205px;height:205px}
+.view-inicio .coach-strip .borjai-robot{width:245px;height:245px;min-height:0;max-height:none;object-fit:contain;flex:0 0 245px}
 
-/* Gastos: center the donut + legend as one visual group, using the panel space better. */
-.expenses-redesign .expense-chart-content { grid-template-columns: 47% 53%; width: min(100%, 880px); margin: 0 auto; }
-.expenses-redesign .expense-donut-wrap { margin-left: auto; margin-right: auto; }
-.expenses-redesign .expense-category-list { padding-left: 12px; padding-right: 8px; }
-.expenses-redesign .expense-category-row { min-height: 22px; height: 22px; }
-.expenses-redesign .expense-category-panel .panel-note { text-transform: none; }
+/* GASTOS: centrar el donut y la leyenda como un único bloque. */
+.expenses-redesign .expense-chart-content{grid-template-columns:minmax(250px,42%) minmax(300px,58%);width:min(100%,820px);min-height:285px;margin:0 auto;align-items:center}
+.expenses-redesign .expense-donut-wrap{margin-left:auto;margin-right:auto}
+.expenses-redesign .expense-category-list{padding-left:14px;padding-right:8px}
+.expenses-redesign .expense-category-row{min-height:22px;height:22px}
+.expenses-redesign .expense-category-panel .panel-note{letter-spacing:.02em}
 
-/* Ingresos: compact the typography and remove the excessive vertical whitespace from the reference. */
-.view-ingresos .view-head { margin-bottom: 18px; }
-.view-ingresos .view-head h1 { font-size: 28px; line-height: 1.1; }
-.view-ingresos .view-head p { font-size: 12px; }
-.view-ingresos .income-card { min-height: 104px; padding: 16px; }
-.view-ingresos .income-card strong { font-size: 23px; }
-.view-ingresos .income-layout { gap: 14px; margin-top: 14px; }
-.view-ingresos .income-overview, .view-ingresos .income-reading { min-height: 315px; padding: 18px; }
-.view-ingresos .income-overview-body { height: 230px; max-width: 690px; }
-.view-ingresos .income-total-ring { width: 180px; height: 180px; }
-.view-ingresos .income-total-ring strong { font-size: 23px; }
-.view-ingresos .income-breakdown { padding-right: 18px; }
-.view-ingresos .income-recent { margin-top: 14px; min-height: 220px; }
+/* INGRESOS: tamaño y espacios de la captura de referencia. */
+.view-ingresos .view-head{margin-bottom:16px}
+.view-ingresos .view-head h1{font-size:27px;line-height:1.1}
+.view-ingresos .view-head p{font-size:12px;margin-top:5px}
+.view-ingresos .income-summary-grid{gap:12px}
+.view-ingresos .income-card{min-height:98px;padding:14px}
+.view-ingresos .income-card strong{font-size:22px}
+.view-ingresos .income-card small{font-size:10px}
+.view-ingresos .income-layout{gap:12px;margin-top:12px}
+.view-ingresos .income-overview,.view-ingresos .income-reading{min-height:285px;padding:17px}
+.view-ingresos .income-overview-body{height:205px;max-width:650px}
+.view-ingresos .income-total-ring{width:165px;height:165px}
+.view-ingresos .income-total-ring strong{font-size:21px}
+.view-ingresos .income-breakdown{padding-right:15px}
+.view-ingresos .income-breakdown>div{padding:10px 0}
+.view-ingresos .income-reading>p{margin:14px 0 8px}
+.view-ingresos .income-reading-row{padding:10px 0}
+.view-ingresos .income-recent{margin-top:12px;min-height:190px}
 
-@media (max-width: 1100px) {
-  .view-inicio .coach-strip { grid-template-columns: minmax(0,1fr) 320px; }
-  .expenses-redesign .expense-chart-content { width: 100%; }
+/* Meses en MAYÚSCULAS, tal y como has marcado en la captura. */
+.expenses-redesign .expense-category-panel .panel-note,.expenses-redesign .panel-note{ text-transform:uppercase!important }
+
+@media(max-width:1100px){
+ .view-inicio .coach-strip{grid-template-columns:minmax(0,1fr) 250px}
+ .view-inicio .coach-strip .coach-art{width:250px;min-width:250px}
+ .view-inicio .coach-strip .borjai-robot{width:215px;height:215px;flex-basis:215px}
+ .expenses-redesign .expense-chart-content{width:100%}
 }
-@media (max-width: 760px) {
-  .view-inicio .coach-strip { grid-template-columns: 1fr; }
-  .view-inicio .coach-strip .coach-art { min-height: 190px; }
-  .expenses-redesign .expense-chart-content { grid-template-columns: 1fr; width: 100%; }
-  .expenses-redesign .expense-category-list { padding-left: 0; }
-  .view-ingresos .income-overview-body { height: auto; }
+@media(max-width:760px){
+ .view-inicio .coach-strip{grid-template-columns:1fr;height:auto;min-height:0}
+ .view-inicio .coach-strip .coach-art{width:100%;min-width:0;height:180px;min-height:180px}
+ .view-inicio .coach-strip .borjai-robot{width:190px;height:190px;flex-basis:190px}
+ .expenses-redesign .expense-chart-content{grid-template-columns:1fr;width:100%;min-height:0}
+ .expenses-redesign .expense-category-list{padding-left:0}
+ .view-ingresos .income-overview-body{height:auto}
 }
