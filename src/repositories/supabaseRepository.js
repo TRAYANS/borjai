@@ -30,6 +30,8 @@ const CONFLICT_KEYS = {
   wealth_snapshots: "user_id,legacy_id"
 };
 
+const PROFILE_KEY = "borjai_profile";
+
 async function requireUser(client) {
   const result = await client.auth.getUser();
   if (result.error) throw result.error;
@@ -98,6 +100,11 @@ async function upsertTable(client, table, rows, userId) {
   }
 }
 
+function profileFromUser(user, fallbackFactory) {
+  const fallback = fallbackFactory ? fallbackFactory() : { profile: {} };
+  return { ...(fallback.profile || {}), ...(user?.user_metadata?.[PROFILE_KEY] || {}) };
+}
+
 export function createSupabaseRepository(client, fallbackFactory) {
   return {
     kind: "supabase",
@@ -123,6 +130,7 @@ export function createSupabaseRepository(client, fallbackFactory) {
       const rows = {};
       for (const table of TABLES) rows[table] = await selectAll(client, table, user.id);
       const loaded = fromDatabaseRows(rows, fallbackFactory);
+      loaded.profile = profileFromUser(user, fallbackFactory);
 
       if (!Array.isArray(loaded.accounts) || loaded.accounts.length === 0) {
         const fallback = fallbackFactory();
@@ -141,6 +149,10 @@ export function createSupabaseRepository(client, fallbackFactory) {
       for (const table of TABLES) {
         await upsertTable(client, table, rows[table], user.id);
       }
+
+      const metadata = { ...(user.user_metadata || {}), [PROFILE_KEY]: normalized.profile || {} };
+      const profileResult = await client.auth.updateUser({ data: metadata });
+      if (profileResult.error) throw new Error(`Error guardando el perfil financiero: ${profileResult.error.message}`);
 
       return normalized;
     },
