@@ -21,9 +21,11 @@ function greeting(hour) {
 }
 
 function timezoneLabel() {
-  const name = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", timeZoneName: "short" })
-    .formatToParts(new Date()).find((part) => part.type === "timeZoneName")?.value || "Madrid";
-  return name === "GMT+2" || name === "GMT+1" ? `Madrid · ${name}` : `Madrid · ${name}`;
+  const name = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    timeZoneName: "short"
+  }).formatToParts(new Date()).find((part) => part.type === "timeZoneName")?.value || "Madrid";
+  return `Madrid · ${name}`;
 }
 
 function ensureClock() {
@@ -48,11 +50,15 @@ function ensureClock() {
   const pageTitle = document.getElementById("topbar-title");
   const { hour, time } = madridParts();
   const word = greeting(hour);
-  if (pageTitle) pageTitle.textContent = `${word}, Borja`;
+  if (pageTitle && pageTitle.textContent !== `${word}, Borja`) {
+    pageTitle.textContent = `${word}, Borja`;
+  }
+
   const strong = clock.querySelector("strong");
   const small = clock.querySelector("small");
-  if (strong) strong.textContent = time;
-  if (small) small.textContent = timezoneLabel();
+  if (strong && strong.textContent !== time) strong.textContent = time;
+  const zone = timezoneLabel();
+  if (small && small.textContent !== zone) small.textContent = zone;
 
   const context = document.querySelector(".page-context");
   if (context && !context.querySelector(`#${GREETING_ID}`)) {
@@ -112,7 +118,7 @@ function refresh() {
   ensureRobot();
 }
 
+// Do not use a MutationObserver here: the clock and dynamically-rendered views
+// mutate the DOM themselves, which can create a feedback loop and block the app.
 refresh();
-const observer = new MutationObserver(refresh);
-observer.observe(document.documentElement, { childList: true, subtree: true });
-setInterval(ensureClock, 1000);
+setInterval(refresh, 1500);
