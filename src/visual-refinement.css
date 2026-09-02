@@ -1,25 +1,31 @@
-/* BorjaAI · visual reference pass */
-
-/* INICIO: compactar la composición y mostrar el asistente completo. */
+/* BorjaAI · visual reference pass · 2.0.1 final */
 .view-inicio .dashboard-grid,.view-inicio .hero-metrics,.view-inicio .metric-grid,.view-inicio .content-grid,.view-inicio .side-stack{gap:12px}
 .view-inicio .metric-panel{min-height:104px;padding:14px}
 .view-inicio .metric-panel-value{font-size:22px;line-height:1.05}
 .view-inicio .metric-panel-note{font-size:11px;margin-top:6px}
 .view-inicio .chart-panel,.view-inicio .recommendation-panel,.view-inicio .distribution-panel{padding:18px}
-.view-inicio .coach-strip{min-height:205px;height:205px;display:grid;grid-template-columns:minmax(0,1fr) 285px;overflow:hidden}
-.view-inicio .coach-strip-copy{min-width:0;padding:18px}
-.view-inicio .coach-strip .coach-art{width:285px;min-width:285px;height:205px;min-height:205px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.view-inicio .coach-strip .coach-art::before{width:205px;height:205px}
-.view-inicio .coach-strip .borjai-robot{width:245px;height:245px;min-height:0;max-height:none;object-fit:contain;flex:0 0 245px}
+/* Robot exclusivamente a la derecha del coach; el texto ocupa siempre la izquierda. */
+.view-inicio .coach-strip{min-height:205px;height:205px;display:grid;grid-template-columns:minmax(0,1fr) 390px;overflow:hidden;position:relative}
+.view-inicio .coach-strip-copy{grid-column:1;min-width:0;padding:18px;position:relative;z-index:2}
+.view-inicio .coach-strip .coach-art{grid-column:2;width:390px;min-width:390px;height:205px;min-height:205px;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;position:relative}
+.view-inicio .coach-strip .coach-art:before{width:250px;height:250px;right:62px;left:auto}
+.view-inicio .coach-strip .borjai-robot{width:360px;height:310px;min-height:0;max-height:none;object-fit:contain;flex:0 0 360px;position:relative;z-index:1;transform:translateX(12px)}
 
-/* GASTOS: centrar el donut y la leyenda como un único bloque. */
-.expenses-redesign .expense-chart-content{grid-template-columns:minmax(250px,42%) minmax(300px,58%);width:min(100%,820px);min-height:285px;margin:0 auto;align-items:center}
-.expenses-redesign .expense-donut-wrap{margin-left:auto;margin-right:auto}
-.expenses-redesign .expense-category-list{padding-left:14px;padding-right:8px}
-.expenses-redesign .expense-category-row{min-height:22px;height:22px}
-.expenses-redesign .expense-category-panel .panel-note{letter-spacing:.02em}
+/* GASTOS: donut + leyenda centrados dentro del recuadro, sin hueco superior. */
+.expenses-redesign .expense-category-panel{overflow:hidden}
+.expenses-redesign .expense-category-panel .panel-head{margin-bottom:2px}
+.expenses-redesign .expense-category-panel .panel-note{text-transform:uppercase!important;letter-spacing:.025em}
+.expenses-redesign .expense-chart-content{display:grid;grid-template-columns:300px 430px;justify-content:center;align-items:center;column-gap:22px;width:min(100%,752px);height:245px;min-height:245px;margin:0 auto;padding:0;box-sizing:border-box}
+.expenses-redesign .expense-donut-wrap{width:240px;height:240px;margin:0 auto;display:flex;align-items:center;justify-content:center;align-self:center}
+.expenses-redesign .expense-donut{width:240px;height:240px;display:grid;place-items:center;position:relative}
+.expenses-redesign .expense-donut-svg{width:240px;height:240px;display:block}
+.expenses-redesign .expense-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.expenses-redesign .expense-category-list{width:100%;padding:0;align-self:center;display:flex;flex-direction:column;justify-content:center}
+.expenses-redesign .expense-category-row{min-height:24px;height:24px;padding:0 4px;border-bottom:1px solid rgba(255,255,255,.055)}
+.expenses-redesign .expense-category-row:last-of-type{border-bottom:0}
+.expenses-redesign .expense-all-categories{margin-top:8px;align-self:flex-end}
 
-/* INGRESOS: tamaño y espacios de la captura de referencia. */
+/* INGRESOS: tamaño compacto y ordenado. */
 .view-ingresos .view-head{margin-bottom:16px}
 .view-ingresos .view-head h1{font-size:27px;line-height:1.1}
 .view-ingresos .view-head p{font-size:12px;margin-top:5px}
@@ -38,20 +44,19 @@
 .view-ingresos .income-reading-row{padding:10px 0}
 .view-ingresos .income-recent{margin-top:12px;min-height:190px}
 
-/* Meses en MAYÚSCULAS, tal y como has marcado en la captura. */
-.expenses-redesign .expense-category-panel .panel-note,.expenses-redesign .panel-note{ text-transform:uppercase!important }
-
 @media(max-width:1100px){
- .view-inicio .coach-strip{grid-template-columns:minmax(0,1fr) 250px}
- .view-inicio .coach-strip .coach-art{width:250px;min-width:250px}
- .view-inicio .coach-strip .borjai-robot{width:215px;height:215px;flex-basis:215px}
- .expenses-redesign .expense-chart-content{width:100%}
+ .view-inicio .coach-strip{grid-template-columns:minmax(0,1fr) 320px}
+ .view-inicio .coach-strip .coach-art{width:320px;min-width:320px}
+ .view-inicio .coach-strip .borjai-robot{width:310px;height:285px;flex-basis:310px}
+ .expenses-redesign .expense-chart-content{grid-template-columns:270px minmax(300px,1fr);width:100%;column-gap:12px}
 }
 @media(max-width:760px){
  .view-inicio .coach-strip{grid-template-columns:1fr;height:auto;min-height:0}
- .view-inicio .coach-strip .coach-art{width:100%;min-width:0;height:180px;min-height:180px}
- .view-inicio .coach-strip .borjai-robot{width:190px;height:190px;flex-basis:190px}
- .expenses-redesign .expense-chart-content{grid-template-columns:1fr;width:100%;min-height:0}
- .expenses-redesign .expense-category-list{padding-left:0}
+ .view-inicio .coach-strip-copy{grid-column:1}
+ .view-inicio .coach-strip .coach-art{grid-column:1;width:100%;min-width:0;height:190px;min-height:190px}
+ .view-inicio .coach-strip .borjai-robot{width:260px;height:235px;flex-basis:260px;transform:none}
+ .expenses-redesign .expense-chart-content{grid-template-columns:1fr;height:auto;min-height:0;row-gap:12px;padding:8px 0 4px}
+ .expenses-redesign .expense-donut-wrap{margin:0 auto}
+ .expenses-redesign .expense-category-list{width:min(100%,520px);margin:0 auto}
  .view-ingresos .income-overview-body{height:auto}
 }
