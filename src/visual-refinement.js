@@ -1,5 +1,14 @@
 /* Visual reference pass: small DOM-only polish that does not alter financial logic. */
 (function () {
+  function ensureVisualCss() {
+    if (document.getElementById('borjai-visual-refinement-css')) return;
+    const link = document.createElement('link');
+    link.id = 'borjai-visual-refinement-css';
+    link.rel = 'stylesheet';
+    link.href = 'src/visual-refinement.css?v=2.0.3';
+    document.head.appendChild(link);
+  }
+
   function capitalizeMonthLabels() {
     document.querySelectorAll('.expense-category-panel .panel-note').forEach((el) => {
       const text = String(el.textContent || '').trim();
@@ -21,6 +30,7 @@
   }
 
   function refresh() {
+    ensureVisualCss();
     capitalizeMonthLabels();
     markView();
   }
