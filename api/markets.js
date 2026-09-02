@@ -9,10 +9,14 @@ function fetchUrl(base, params) {
   Object.entries(params || {}).forEach(([k,v]) => url.searchParams.set(k, String(v)));
   return url;
 }
+function requestQuery(req) {
+  const raw = String(req.url || "");
+  return new URL(raw, "http://borjai.local").searchParams;
+}
 
 export default async function handler(req,res) {
   if (req.method !== "GET") return res.status(405).json({error:"Method not allowed"});
-  const symbol=String(req.query?.symbol||""), kind=String(req.query?.kind||"yahoo");
+  const query=requestQuery(req), symbol=String(query.get("symbol")||""), kind=String(query.get("kind")||"yahoo");
   if (!symbol || !allowedSymbol(symbol)) return res.status(400).json({error:"Símbolo no válido."});
   const cacheKey=`${kind}:${symbol}`, hit=CACHE.get(cacheKey);
   if (hit && Date.now()-hit.at<TTL) return res.status(200).json(hit.data);
