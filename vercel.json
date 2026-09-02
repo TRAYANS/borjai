@@ -1,6 +1,12 @@
 {
   "version": 2,
   "outputDirectory": ".",
+  "crons": [
+    {
+      "path": "/api/financial-monitor-cron",
+      "schedule": "0 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/",
