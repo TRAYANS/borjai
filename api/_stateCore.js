@@ -97,18 +97,32 @@ export function createConfiguredClient(req) {
   if (!url || !anonKey) throw new Error("Supabase no está configurado.");
   const ownerId = process.env.BORJAI_OWNER_ID || "";
   const token = getBearer(req);
+
+  // Las peticiones normales de la aplicación ya llevan la sesión del usuario.
+  // En ese caso usamos el token del usuario + anon key para respetar RLS y
+  // evitar depender de que la service key tenga permisos sobre las tablas.
+  if (token) {
+    return {
+      client: createRestClient(url, anonKey, token),
+      userId: null,
+      token,
+      serviceRole: false,
+      mode: "rls_authenticated_user"
+    };
+  }
+
+  // El monitor/cron y las operaciones server-side sin sesión usan service role.
   if (serviceKey) {
     return {
       client: createRestClient(url, serviceKey, serviceKey),
       userId: ownerId || null,
-      token: token || null,
-      tokenUserId: null,
+      token: null,
       serviceRole: true,
-      mode: ownerId ? "service_role_owner" : token ? "service_role_authenticated_user" : "service_role_discovered_owner"
+      mode: ownerId ? "service_role_owner" : "service_role_discovered_owner"
     };
   }
-  if (!token) throw new Error("Sesión de BorjaAI no disponible.");
-  return { client: createRestClient(url, anonKey, token), token, serviceRole: false, mode: "rls_user" };
+
+  throw new Error("Sesión de BorjaAI no disponible.");
 }
 
 async function discoverAuthUserId(context) {
@@ -128,14 +142,13 @@ async function discoverAuthUserId(context) {
 
 export async function resolveUser(context) {
   if (context.userId) return context.userId;
+  if (context.token && !context.serviceRole) {
+    const result = await context.client.auth.getUser(context.token);
+    if (result.error || !result.data?.user?.id) throw new Error("Sesión de BorjaAI no válida.");
+    context.userId = result.data.user.id;
+    return context.userId;
+  }
   if (context.serviceRole) {
-    if (context.token) {
-      const authResult = await context.client.auth.getUser(context.token);
-      if (!authResult.error && authResult.data?.user?.id) {
-        context.userId = authResult.data.user.id;
-        return context.userId;
-      }
-    }
     const authUserId = await discoverAuthUserId(context);
     if (authUserId) {
       context.userId = authUserId;
@@ -149,10 +162,7 @@ export async function resolveUser(context) {
     }
     throw new Error("No se pudo identificar la cuenta de BorjaAI.");
   }
-  const result = await context.client.auth.getUser(context.token);
-  if (result.error || !result.data?.user?.id) throw new Error("Sesión de BorjaAI no válida.");
-  context.userId = result.data.user.id;
-  return context.userId;
+  throw new Error("Sesión de BorjaAI no válida.");
 }
 
 export async function loadRows(context) {
