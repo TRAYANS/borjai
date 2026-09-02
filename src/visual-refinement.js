@@ -5,15 +5,14 @@
     const link = document.createElement('link');
     link.id = 'borjai-visual-refinement-css';
     link.rel = 'stylesheet';
-    link.href = 'src/visual-refinement.css?v=2.0.3';
+    link.href = 'src/visual-refinement.css?v=2.0.4';
     document.head.appendChild(link);
   }
 
-  function capitalizeMonthLabels() {
+  function uppercaseMonthLabels() {
     document.querySelectorAll('.expense-category-panel .panel-note').forEach((el) => {
       const text = String(el.textContent || '').trim();
-      if (!text) return;
-      el.textContent = text.charAt(0).toUpperCase() + text.slice(1);
+      if (text) el.textContent = text.toLocaleUpperCase('es-ES');
     });
   }
 
@@ -31,7 +30,7 @@
 
   function refresh() {
     ensureVisualCss();
-    capitalizeMonthLabels();
+    uppercaseMonthLabels();
     markView();
   }
 
