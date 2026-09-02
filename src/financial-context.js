@@ -4,9 +4,41 @@ export function buildFinancialContext(state, key, formatters) {
   const h = health(state, key, formatters);
   const m = metrics(state, key);
   const netWorth = wealth(state);
+  const profile = state.profile || {};
   return {
     currency: "EUR",
     period: key,
+    perfilPersonal: {
+      nombre: profile.name || "",
+      edad: profile.age || null,
+      situacionLaboral: profile.employment || "",
+      ingresosHabituales: Math.round(Number(profile.income || 0)),
+      diaCobro: Number(profile.payDay || 0) || null,
+      dependientes: Number(profile.dependents || 0)
+    },
+    preferenciasFinancieras: {
+      perfilRiesgo: profile.risk || "Moderado",
+      horizonteInversion: profile.horizon || "",
+      filosofia: profile.philosophy || "",
+      prioridades: Array.isArray(profile.priorities) ? profile.priorities : [],
+      mesesEmergencia: Number(profile.emergency || 0),
+      liquidezMinima: Math.round(Number(profile.minimumLiquidity || 0)),
+      protegerMinimo: profile.protectMinimum !== false,
+      aportacionMensual: Math.round(Number(profile.contribution || 0)),
+      objetivoAhorroMensual: Math.round(Number(profile.savingsTarget || 0)),
+      productosPermitidos: Array.isArray(profile.investmentPreferences) ? profile.investmentPreferences : [],
+      activosExcluidos: Array.isArray(profile.excludedAssets) ? profile.excludedAssets : []
+    },
+    coach: {
+      estilo: profile.coachStyle || "Directo",
+      nivelIntervencion: profile.coachIntervention || "Asesor",
+      puedeContradecir: profile.coachChallenge !== false
+    },
+    alertas: {
+      activas: profile.alertEnabled || {},
+      umbralGasto: Math.round(Number(profile.alertSpend || 0)),
+      umbralMensual: Math.round(Number(profile.alertMonthlySpend || 0))
+    },
     patrimonio: {
       neto: Math.round(netWorth),
       liquidez: Math.round(h.liquid),
