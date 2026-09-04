@@ -1,6 +1,5 @@
 import { loadRuntimeConfig, hasSupabaseConfig } from "./config.js";
 import { createSupabaseClient } from "./db/supabaseClient.js";
-import { runOneTimeEconomicReset } from "./one-time-economic-reset.js";
 
 const ACCESS_KEY = "borjai:access";
 const SESSION_KEY = "borjai:supabase:session:v1";
@@ -83,7 +82,6 @@ async function start() {
   if (user && isAllowedEmail(user.email) && user.email_confirmed_at) {
     if (authType === "recovery") { screen("recover", "Has verificado tu identidad. Elige una nueva contraseña."); return; }
     localStorage.setItem(AUTHENTICATED_KEY, "1"); localStorage.setItem(ACCESS_KEY, "ok");
-    await runOneTimeEconomicReset();
     await loadApplication();
     return;
   }
