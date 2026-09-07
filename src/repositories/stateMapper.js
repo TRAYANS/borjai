@@ -7,6 +7,16 @@ function legacyId(prefix, id) {
   return String(id || prefix + "-missing");
 }
 
+function stableTransactionLegacyId(t, occurrence) {
+  const raw = [t.date || "", t.accountId || "", t.type || "", t.category || "", String(asNumber(t.amount).toFixed(2)), t.merchant || "", t.description || "", String(occurrence || 1)].join("|");
+  let hash = 2166136261;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash ^= raw.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `transaction-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
 export function normalizeState(state, fallbackFactory) {
   const fallback = fallbackFactory ? fallbackFactory() : {};
   const source = state && state.version === 1 ? state : fallback;
@@ -84,6 +94,7 @@ export function toDatabaseRows(state, userId) {
 
   const transactions = dedupeTransactions(state.transactions);
   const transactionTotals = new Map();
+  const occurrenceByFingerprint = new Map();
   transactions.forEach(function(t) {
     if (!t.accountId) return;
     transactionTotals.set(t.accountId, (transactionTotals.get(t.accountId) || 0) + asNumber(t.amount));
@@ -109,9 +120,12 @@ export function toDatabaseRows(state, userId) {
       return { user_id: userId, name: c.name, type: c.type, is_system: false };
     }),
     transactions: transactions.map(function(t) {
+      const fingerprint = fingerprintTransaction(t);
+      const occurrence = (occurrenceByFingerprint.get(fingerprint) || 0) + 1;
+      occurrenceByFingerprint.set(fingerprint, occurrence);
       return {
         user_id: userId,
-        legacy_id: legacyId("transaction", t.id),
+        legacy_id: stableTransactionLegacyId(t, occurrence),
         legacy_import_id: t.importId || null,
         account_legacy_id: t.accountId || null,
         destination_account_legacy_id: t.destinationAccountId || null,
