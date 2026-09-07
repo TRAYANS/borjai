@@ -68,7 +68,9 @@ test("parsea CSV con punto y coma, importes europeos y categoria automatica", fu
     amount: -45.3,
     type: "expense",
     category: "Alimentacion",
-    accountId: "bank"
+    accountId: "bank",
+    source: "csv",
+    importId: ""
   });
   assert.equal(rows[1].amount, 2000);
   assert.equal(rows[1].type, "income");
