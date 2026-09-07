@@ -45,9 +45,10 @@ test("el repositorio local conserva compatibilidad con borjai:mvp:v1", async fun
   assert.equal(api.backendStatus().mode, "local");
 });
 
-test("financialApi no usa localStorage como fallback silencioso en modo api", async function() {
+test("financialApi conserva una copia local con datos si el backend falla en modo api", async function() {
   const storage = memoryStorage();
-  storage.setItem("borjai:mvp:v1", JSON.stringify(sampleState()));
+  const state = sampleState();
+  storage.setItem("borjai:mvp:v1", JSON.stringify(state));
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async function() {
     return {
@@ -68,8 +69,9 @@ test("financialApi no usa localStorage como fallback silencioso en modo api", as
     });
     const loaded = await api.load();
     assert.equal(api.backendStatus().mode, "unavailable");
-    assert.equal(loaded.transactions.length, 0);
-    assert.equal(loaded.accounts.length, 0);
+    assert.equal(loaded.transactions.length, state.transactions.length);
+    assert.equal(loaded.accounts.length, state.accounts.length);
+    assert.equal(loaded.assets.length, state.assets.length);
   } finally {
     globalThis.fetch = originalFetch;
   }
