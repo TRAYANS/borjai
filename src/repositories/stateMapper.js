@@ -82,23 +82,33 @@ export function toDatabaseRows(state, userId) {
     if (t.category) categories.set(t.category, { name: t.category, type: t.type === "income" ? "income" : t.type === "transfer" ? "transfer" : t.type && t.type.startsWith("investment") ? "investment" : "expense" });
   });
 
+  const transactions = dedupeTransactions(state.transactions);
+  const transactionTotals = new Map();
+  transactions.forEach(function(t) {
+    if (!t.accountId) return;
+    transactionTotals.set(t.accountId, (transactionTotals.get(t.accountId) || 0) + asNumber(t.amount));
+  });
+
   return {
     accounts: (state.accounts || []).map(function(a) {
+      const initial = asNumber(a.initialBalance);
+      const total = transactionTotals.get(a.id);
+      const current = total == null ? asNumber(a.balance) : initial + total;
       return {
         user_id: userId,
         legacy_id: legacyId("account", a.id),
         name: a.name || "Cuenta",
         type: a.kind || "checking",
         currency: a.currency || "EUR",
-        initial_balance: asNumber(a.initialBalance || a.balance),
-        current_balance: asNumber(a.balance),
+        initial_balance: initial,
+        current_balance: current,
         is_active: a.isActive !== false
       };
     }),
     categories: Array.from(categories.values()).map(function(c) {
       return { user_id: userId, name: c.name, type: c.type, is_system: false };
     }),
-    transactions: dedupeTransactions(state.transactions).map(function(t) {
+    transactions: transactions.map(function(t) {
       return {
         user_id: userId,
         legacy_id: legacyId("transaction", t.id),
@@ -161,7 +171,7 @@ export function fromDatabaseRows(rows, fallbackFactory) {
   return {
     version: 1,
     profile: fallback.profile || {},
-    accounts: (rows.accounts || []).map(function(a) { return { id: a.legacy_id || a.id, name: a.name, kind: a.type === "cash" ? "cash" : a.type === "broker" ? "broker" : "bank", balance: asNumber(a.current_balance) }; }),
+    accounts: (rows.accounts || []).map(function(a) { return { id: a.legacy_id || a.id, name: a.name, kind: a.type === "cash" ? "cash" : a.type === "broker" ? "broker" : "bank", balance: asNumber(a.current_balance), initialBalance: asNumber(a.initial_balance) }; }),
     assets: (rows.assets || []).map(function(a) { const metadata = a.metadata || {}; return { id: a.legacy_id || a.id, name: a.name, ticker: a.ticker || "", group: metadata.group || "Otros Activos", type: metadata.legacyType || a.type, value: asNumber(a.current_value), cost: asNumber(a.cost_basis) }; }),
     debts: (rows.liabilities || []).map(function(d) { return { id: d.legacy_id || d.id, name: d.name, type: d.type, balance: asNumber(d.outstanding_balance), currency: d.currency || "EUR" }; }),
     transactions: dedupeTransactions((rows.transactions || []).map(function(t) { return { id: t.legacy_id || t.id, date: t.date, merchant: t.merchant || t.description, description: t.description, amount: asNumber(t.amount), type: t.type, category: t.category_name || "Otros", subcategory: t.subcategory || "", accountId: t.account_legacy_id, destinationAccountId: t.destination_account_legacy_id || "", source: t.source || "manual", notes: t.notes || "", importId: t.legacy_import_id || "" }; })),
