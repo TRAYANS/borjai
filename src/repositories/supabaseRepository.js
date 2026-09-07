@@ -131,11 +131,6 @@ export function createSupabaseRepository(client, fallbackFactory) {
       for (const table of TABLES) rows[table] = await selectAll(client, table, user.id);
       const loaded = fromDatabaseRows(rows, fallbackFactory);
       loaded.profile = profileFromUser(user, fallbackFactory);
-
-      if (!Array.isArray(loaded.accounts) || loaded.accounts.length === 0) {
-        const fallback = fallbackFactory();
-        loaded.accounts = Array.isArray(fallback.accounts) ? fallback.accounts : [];
-      }
       return loaded;
     },
 
