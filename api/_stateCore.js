@@ -95,49 +95,14 @@ export function createConfiguredClient(req) {
   const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   if (!url || !anonKey) throw new Error("Supabase no está configurado.");
-  const ownerId = process.env.BORJAI_OWNER_ID || "";
   const token = getBearer(req);
-
-  // Las peticiones normales de la aplicación ya llevan la sesión del usuario.
-  // En ese caso usamos el token del usuario + anon key para respetar RLS y
-  // evitar depender de que la service key tenga permisos sobre las tablas.
   if (token) {
-    return {
-      client: createRestClient(url, anonKey, token),
-      userId: null,
-      token,
-      serviceRole: false,
-      mode: "rls_authenticated_user"
-    };
+    return { client: createRestClient(url, anonKey, token), userId: null, token, serviceRole: false, mode: "rls_authenticated_user" };
   }
-
-  // El monitor/cron y las operaciones server-side sin sesión usan service role.
-  if (serviceKey) {
-    return {
-      client: createRestClient(url, serviceKey, serviceKey),
-      userId: ownerId || null,
-      token: null,
-      serviceRole: true,
-      mode: ownerId ? "service_role_owner" : "service_role_discovered_owner"
-    };
+  if (serviceKey && process.env.BORJAI_OWNER_ID) {
+    return { client: createRestClient(url, serviceKey, serviceKey), userId: process.env.BORJAI_OWNER_ID, token: null, serviceRole: true, mode: "service_role_owner" };
   }
-
   throw new Error("Sesión de BorjaAI no disponible.");
-}
-
-async function discoverAuthUserId(context) {
-  const root = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-  if (!root || !serviceKey) return null;
-  const response = await fetch(`${root}/auth/v1/admin/users?per_page=1000&page=1`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Accept: "application/json" },
-    cache: "no-store"
-  });
-  if (!response.ok) return null;
-  const payload = await response.json().catch(() => ({}));
-  const users = Array.isArray(payload) ? payload : (payload.users || []);
-  const allowed = users.find((user) => user?.email && user.email.toLowerCase() === "borjabuzquin@gmail.com") || users.find((user) => user?.id);
-  return allowed?.id || null;
 }
 
 export async function resolveUser(context) {
@@ -148,20 +113,7 @@ export async function resolveUser(context) {
     context.userId = result.data.user.id;
     return context.userId;
   }
-  if (context.serviceRole) {
-    const authUserId = await discoverAuthUserId(context);
-    if (authUserId) {
-      context.userId = authUserId;
-      return context.userId;
-    }
-    for (const table of TABLES) {
-      const result = await context.client.from(table).select("user_id").order("created_at", { ascending: true });
-      if (result.error) continue;
-      const candidate = (result.data || []).find((row) => row.user_id);
-      if (candidate?.user_id) { context.userId = candidate.user_id; return context.userId; }
-    }
-    throw new Error("No se pudo identificar la cuenta de BorjaAI.");
-  }
+  if (context.serviceRole && process.env.BORJAI_OWNER_ID) return context.userId;
   throw new Error("Sesión de BorjaAI no válida.");
 }
 
